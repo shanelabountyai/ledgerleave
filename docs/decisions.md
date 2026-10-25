@@ -1,0 +1,93 @@
+# Ledgerleave — Resolved Decisions & Open Items
+
+The PRD leaves several rules open. The golden cases and measurements in `docs/domain-brief.md` §8–§11 encode the answers below. If you change a decision, change `tools/leavelib.py`, the brief and the fixtures deliberately, not the tests. **This file outranks PRD text.**
+
+## Resolved
+
+### Owner decisions (Shane, 2026-10-25)
+
+| # | Decision | Why |
+|---|----------|-----|
+| D-1 | **All data is synthetic, generated from a seed, with the oracle's answers frozen next to it.** `tools/build_fixtures.py --seed 20261025` writes the org, policies, assignments, holidays, timesheets, delegations, org changes, opening balances, requests and request events; `tools/reference_leave.py --write-expected` writes `ledger.csv`, `expected_balances.csv`, `expected_requests.csv`. sha256 of all 14 files in brief §12 and `fixtures/MANIFEST.json`. Twenty scripted requests (S01–S20) and seven scripted hires carry the traps in brief §4. | No real people, ever. An answer key is the only way to report agreement as a number |
+| D-2 | **Two pure engines, no model.** `src/accrual/` and `src/routing/` are deterministic functions of data; an LLM appears only as a P1 explainer experiment (O-8). | The lesson is replay and routing as data, not inference |
+| D-3 | **Model pinned to Claude Fable 5.1** (`claude-fable-5-1`) in `.claude/settings.json` for specs and build. | Owner's call |
+| D-4 | **Stack:** clone of saas-foundation v1.3.0 with shared git history (Next.js 16, Prisma 7, PostgreSQL 17, vitest, Playwright). **Port 6300 proposed**; the first session confirms against the port table in `~/.claude/CLAUDE.md` when reachable, else records "unverified". Known at kickoff from the template's CLONES.md and sibling kits: 3000–4200, 4600–4900, 5100–5400, 5500, 5800, 5900, 6100 in use or reserved; 6000 is refused by Next.js/Chrome (gavel D-41); 6200 unknown from here. Built unattended in a cloud session; branch + PR, never merged by the agent; CI is the gate. **Public repo** `shanelabountyai/ledgerleave`. | House rules |
+| D-5 | **Foundation modules:** keep orgs, roles, invites, audit log, **notifications/outbox** (approval notifications queue there). **Remove or leave unwired:** billing, share links, via `foundation:check-modules` if present, else leave unwired and record here. | Nothing is billed or shared out of this product; the outbox is the "nothing leaves" seam |
+
+### Units, calendar, ledger
+
+| # | Decision | Why |
+|---|----------|-----|
+| D-6 | **Time is integer minutes; a work day is 480.** Rounding happens once per accrual event with the policy's rule: `HALF_UP` (`(2n + d) // 2d`) or `FLOOR`. No float touches a minute; `engine:lint` fails on one. | LoanBook's integer-cents discipline, applied to time |
+| D-7 | **Dates are `YYYY-MM-DD` strings on a calendar axis.** The engines use a hand-written calendar module (C1–C5); no `new Date(string)`, no `@db.Date`, no timezone. Completed months of tenure clamp the hire day to the month's length (C4); an anniversary that lands on a missing day (Feb 29) clamps to the month's last day (C3). | Bookable's rule; the oracle uses Python `date` for arithmetic only |
+| D-8 | **The ledger is append-only and the balance is derived.** `balance(asOf)` = Σ minutes of entries with `effective ≤ asOf`, whenever posted (L1); `available` = Σ every posted entry (L2). No stored balance anywhere. Kinds: `ACCRUAL`, `USAGE`, `USAGE_REVERSAL`, `ADJUSTMENT`, `FORFEITURE`, `TRANSFER_OUT`, `TRANSFER_IN`. **Usage is one row per working day**, effective that day; a reversal mirrors each usage row, effective the same day, posted on the cancel date. | One row per day makes every boundary question (calendar, anniversary, policy year) fall out of effective-date ordering |
+| D-9 | **Posting order within a day:** opening adjustments, transfers, accruals (class 0, by employee/leave type/policy) → request events (class 1, by request id and seq) → year boundaries (class 2). So the year-end accrual posts **before** the carryover forfeiture is measured, and a submit on the 31st sees that day's accrual. | Chosen and stated; GA-06, GA-14 pin it |
+| D-10 | **Retroactive entries recompute forfeiture, never accruals.** An entry whose effective date lies in a closed policy year (a cancellation's reversal, a late sick approval) triggers one re-derivation of every forfeiture from that boundary on; the delta is posted as a `CARRYOVER_RECOMPUTED` row effective on the boundary, posted on the day of the trigger (A7). Past accruals' max-balance caps are not revisited: an accrual's cap is measured against the balance as of its date at posting time (A5). | Carryover is a measurement of the year's final state; an accrual is an entitlement earned at a point in time. GA-10 proves the recompute; S13 in the fixtures proves the give-back direction |
+| D-11 | **Ledger starts 2024-01-01.** Employees hired earlier get an `ADJUSTMENT` with code `OPENING_BALANCE` effective 2023-12-31, generated. Tenure for tiers and anniversaries counts from the real hire date. | Replaying ten years of synthetic timesheets adds nothing; tenure must still be true |
+| D-12 | **Negative-balance check at submit only** (A8): if the policy's `allow_negative` is false and `available − requested < 0`, the request is `DENIED` with `INSUFFICIENT_BALANCE` by the system at submit; the chain is still computed and shown. No projection of future scheduled accruals (O-1); pending requests reserve nothing (O-2); approval does not re-check. | Deterministic and explainable; the policy that would project `PER_HOURS_WORKED` has no timesheet yet |
+| D-13 | **Termination:** the final month's `MONTHLY` accrual is prorated by active days and posts on the month's last day; `PER_PAY_PERIOD`/`PER_HOURS_WORKED` post only when the assignment is active on the period end; no boundary is processed after the assignment ends, so the ledger freezes (no payout, O-7). | GA-19 |
+| D-14 | **Policy transfer** (hourly → salaried): assignments of one leave type abut; on the new assignment's start the engine posts `TRANSFER_OUT` under the old policy and `TRANSFER_IN` under the new one for the balance as of that date (zero-sum). The new policy's frequency, year type and caps govern from that date; the transferred balance is not capped at transfer (O-10). The month of transfer is prorated under the new policy by its active days. | GA-18: a one-day June assignment accrues 20 minutes, and that is right |
+
+### Policies as data
+
+| # | Decision | Why |
+|---|----------|-----|
+| D-15 | **Closed vocabularies**, validated on load: `frequency ∈ {MONTHLY, PER_PAY_PERIOD, ANNIVERSARY, PER_HOURS_WORKED}`, `proration ∈ {DAILY, NONE}` (DAILY only with MONTHLY), `rounding ∈ {HALF_UP, FLOOR}`, `year.type ∈ {CALENDAR, POLICY_YEAR, ANNIVERSARY}`; tiers as `[{min_tenure_months, minutes_per_period}]` with a 0 tier first; `carryover_cap_minutes`, `max_balance_minutes`, `allow_negative`; `routing.skip_level_over_days`, `routing.hr_over_days` (null = no step). No expressions, no `eval`. | Adjuster D1 reasoning |
+| D-16 | **Tier by completed months at the event date** (A2): the highest tier whose `min_tenure_months ≤ tenure` wins, evaluated per accrual event, so a tier changes mid-year on the first event at or after the anniversary. | GA-05: July 600, August 720 |
+| D-17 | **Three fixture policies** (brief §3): `PTO_SALARIED` monthly 600/720/840 by tenure 0/24/60 months, DAILY proration, HALF_UP, CALENDAR year, carryover cap 2400, max 12000, no negative; `PTO_HOURLY` 2 minutes per 60 worked, FLOOR, ANNIVERSARY year, cap 2400, max 4800, no negative; `SICK_STD` 120 per biweekly period, NONE proration, POLICY_YEAR starting 07-01, cap 2400, max 2880, negative allowed. `ANNIVERSARY` frequency and HALF_UP on an exact .5 are pinned by hand policies in GA-20 and GA-04, not by the fixtures. | Covers every vocabulary value at least once between fixtures and goldens |
+
+### Routing and requests
+
+| # | Decision | Why |
+|---|----------|-----|
+| D-18 | **Routing table as data; three step kinds.** `MANAGER` always; `SKIP_LEVEL` when working days > the policy's `skip_level_over_days`; `HR` when > `hr_over_days`. Thresholds live on the policy, step order on the table. | Routing differs by leave type, so the policy owns the thresholds |
+| D-19 | **Rules R1–R9 and their codes** (brief §6): the CEO's manager is the HR primary (`CEO_MANAGER_IS_HR`); an inactive approver is skipped upward (`APPROVER_INACTIVE_TO_MANAGER`); nobody approves their own request (`SELF_APPROVAL_TO_MANAGER`); delegation is one hop (`DELEGATED`), a delegating delegate is `DELEGATION_DEPTH_EXCEEDED` → fallback, a delegate who is the requester drops the step (`DELEGATE_IS_REQUESTER_STEP_DROPPED`), a delegate without HR for an HR-selected step is `DELEGATE_LACKS_HR_ROLE` → fallback; fallback order is HR primary → other HR holders → CEO, never the requester, never delegated (`FALLBACK_TO_HR` / `FALLBACK_TO_CEO` / `UNROUTABLE`); one person approves once (`DUPLICATE_APPROVER_COLLAPSED`); an empty chain gets a `FALLBACK` step (`EMPTY_CHAIN_TO_HR`). The **HR primary is the lowest employee id holding HR on the submit date.** The CEO's chain never climbs above HR (O-9). | Every code has a GR golden; "primary" must be deterministic |
+| D-20 | **The chain is frozen at submit** (R9). Org changes, delegations and role changes after submit do not re-route. Eligibility is checked at each approval (S3): actor equals the step's current approver, is employed that day, and holds HR if the step selected an HR holder (`step_requires_hr`, decided by the last selection code). Otherwise the event is **void** (`APPROVER_NOT_STEP_APPROVER`, `APPROVER_INACTIVE`, `APPROVER_INELIGIBLE_ROLE_REVOKED`) and logged. An HR holder may `REASSIGN` a pending step. | GR-15, S06, S07: history is not rewritten, and a stuck step has one human exit |
+| D-21 | **State machine as a table** (brief §7): `DRAFT→SUBMITTED` (submit, chain frozen, balance check), `SUBMITTED→PENDING` (route), `SUBMITTED→DENIED` (system), `PENDING→PENDING|APPROVED` (approve), `PENDING→DENIED`, `PENDING→CANCELLED`, `PENDING→PENDING` (reassign), `APPROVED→CANCELLED`. Anything else is ignored and logged (`IGNORED_TERMINAL`, `IGNORED_NOT_PENDING`). Cancel is allowed to the requester or an HR holder, at any time after approval (even after the dates), and writes reversals (S4). | Bracketry/BoxLoop state-table discipline |
+| D-22 | **Request minutes = working days × 480**; working days are Mon–Fri inside the inclusive range minus company holidays (C1). The policy for a request is the assignment active on its start date. | Whole days only (O-5) |
+| D-23 | **Outbox (Phase 2):** `APPROVAL_REQUESTED` per kept step when it becomes current, `APPROVED`/`DENIED` to the requester, all `QUEUED`, never sent. | Callboard/Showcall outbox pattern |
+
+### Evaluation
+
+| # | Decision | Why |
+|---|----------|-----|
+| D-24 | **`leave:eval` reproduces the oracle byte for byte**: `ledger.csv` (5057 rows), `expected_balances.csv` (198 rows), `expected_requests.csv` (389 rows). The target is 0 diffs. Every write-up says: these numbers measure TypeScript–Python agreement on fixtures written by the same author; they say nothing about whether the policies suit any real company. | Overclaiming is the failure mode this owner cares most about |
+| D-25 | **The oracle's own sanity checks are the goldens.** GA-01..GA-20 and GR-01..GR-15 were derived by hand in the brief and then confirmed by `tools/golden_answers.py`; three hand derivations were wrong at kickoff and corrected (see Review log). | A golden that was never wrong was never checked |
+| D-26 | **The sick policy is labelled a sample.** The policy editor and README say: "shaped like a statutory accrual floor (fixed accrual per pay period, carryover cap, max balance); not any jurisdiction's law; no HR or legal advice." | Scope honesty |
+| D-27 | **2026 holidays are not in the fixture.** The one request pending at as-of (S15, dated 2026-01-12..20) counts 7 working days because no 2026 holiday is listed; this is stated, not fixed. | The as-of date is 2025-12-31; the holiday list ends there |
+| D-28 | **Reuse scan:** `~/Projects/reuse-scan.py` is not reachable from the cloud session; `docs/portfolio-overlap.md` is the manual substitute and each donor is read before porting (task 1.3). Record the skip with a date in this table when the first session runs. | Cloud build |
+
+## Open — need Shane's call (defaults are in force until changed)
+
+| # | Question | Default | Why it's open |
+|---|----------|---------|---------------|
+| O-1 | Project scheduled accruals (monthly / pay period) into the balance check at submit? | **No**; `available` as posted | A request for next month is denied today though the balance will cover it by then; projection is easy for fixed frequencies and impossible for hours worked |
+| O-2 | Do pending (unapproved) requests reserve balance? | **No** | Two overlapping pending requests can both pass the check; the second approval goes negative only if the policy allows |
+| O-3 | May the delegator approve a step that was delegated? | **No**; only the resolved approver | Common in HR systems; would add `APPROVED_BY_DELEGATOR` and a golden |
+| O-4 | Cancel after year end: recompute the old year's forfeiture (default) or restore the minutes into the new year up to the cap? | **Recompute** (D-10) | The default keeps year-end reports true to what happened; the alternative is friendlier to the employee |
+| O-5 | Half-day requests | **No** (P1) | Changes D-22 and the usage row shape |
+| O-6 | Overlap / double-booking validation | **Phase 2 validation** `OVERLAPPING_REQUEST`; fixtures have none | Needs the request store |
+| O-7 | Payout or forfeiture at termination | **None**; ledger freezes (D-13) | Policy and jurisdiction dependent |
+| O-8 | LLM anywhere | **No** in Phases 1–3; P1 experiment: policy-JSON explainer scored against the goldens | The engines are the product path |
+| O-9 | CEO's long leave: HR alone (default) or HR plus a board/second approver? | **HR alone** (GR-08) | Routing table could add a `BOARD` step as data |
+| O-10 | Transfer-in above the new policy's max balance | **Not capped**; accrual pauses until usage brings it under | Capping at transfer would forfeit earned time on a job change |
+
+## Not modeled (seams only)
+
+Half days · overlap and blackout rules · payroll and payout · leave encashment · statutory compliance tracking · calendar sync · email · multi-location holidays · policy versioning with effective dates · multi-tenant billing · public API.
+
+## Review log (2026-10-25)
+
+Kit written and run in the cloud workspace before handoff. Findings from running the oracle against the hand-derived goldens and the generated fixtures:
+
+| Finding | Outcome |
+|---|---|
+| GA-10 hand derivation expected one `CARRYOVER_RECOMPUTED` row of −960; the engine posted two rows of −480, one per reversed day | Engine changed: reversals and usage post as a batch and recompute **once** per approval or cancellation (A7). Brief and golden say one row |
+| GA-17 asserted `available` at the end of the run, which included the May 31 accrual | Golden fixed to assert as of 2024-05-15; the denial itself was already right |
+| GR-08 (CEO, 11 days): the engine climbed from the HR primary to the HR primary's manager for the skip-level step | Rule stated (D-19, O-9): the CEO's chain never climbs above HR; skip-level resolves to the same HR primary and collapses |
+| Generated usage drained the balances of employees carrying scripted traps (S07's 12-day request was system-denied; S16 was denied for balance instead of by its approver) | Eight employees with scripted requests get no generated requests; S16 shortened to 2 days. Both traps now land as scripted |
+| S13's retroactive sick approval found no forfeiture to recompute (E024's generated sick usage kept the June 30 balance under the cap) | E024 excluded from generation; the fixture now shows the **give-back** direction of A7 (+480) as well as GA-10's take-back direction |
+| First draft produced 454 requests with 51 (11%) system denials | Request count and lengths trimmed: 389 requests, 33 (8.5%) system denials, mostly hourly employees and January requests after a 5-day carryover cap, which is the policy working as written |
+| `adjusted` column in the employee-year table was always 0 (opening balances are dated 2023-12-31) | Column removed; `opening` carries it |
+
+**Not taken:** projecting accruals in the balance check (O-1); delegator approval (O-3); restoring cancelled minutes into the new year (O-4); a `BOARD` step for the CEO (O-9).

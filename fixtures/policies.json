@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "work_day_minutes": 480,
+  "pay_period": {
+    "anchor_start": "2024-01-01",
+    "length_days": 14
+  },
+  "routing_table": {
+    "steps": [
+      "MANAGER",
+      "SKIP_LEVEL",
+      "HR"
+    ],
+    "delegation_max_depth": 1,
+    "fallback_order": [
+      "HR_PRIMARY",
+      "OTHER_HR",
+      "CEO"
+    ]
+  },
+  "policies": [
+    {
+      "id": "PTO_SALARIED",
+      "leave_type": "PTO",
+      "accrual": {
+        "frequency": "MONTHLY",
+        "proration": "DAILY",
+        "rounding": "HALF_UP",
+        "tiers": [
+          {
+            "min_tenure_months": 0,
+            "minutes_per_period": 600
+          },
+          {
+            "min_tenure_months": 24,
+            "minutes_per_period": 720
+          },
+          {
+            "min_tenure_months": 60,
+            "minutes_per_period": 840
+          }
+        ]
+      },
+      "year": {
+        "type": "CALENDAR"
+      },
+      "carryover_cap_minutes": 2400,
+      "max_balance_minutes": 12000,
+      "allow_negative": false,
+      "routing": {
+        "skip_level_over_days": 5,
+        "hr_over_days": 10
+      }
+    },
+    {
+      "id": "PTO_HOURLY",
+      "leave_type": "PTO",
+      "accrual": {
+        "frequency": "PER_HOURS_WORKED",
+        "minutes_per_60_worked": 2,
+        "proration": "NONE",
+        "rounding": "FLOOR"
+      },
+      "year": {
+        "type": "ANNIVERSARY"
+      },
+      "carryover_cap_minutes": 2400,
+      "max_balance_minutes": 4800,
+      "allow_negative": false,
+      "routing": {
+        "skip_level_over_days": 5,
+        "hr_over_days": 10
+      }
+    },
+    {
+      "id": "SICK_STD",
+      "leave_type": "SICK",
+      "accrual": {
+        "frequency": "PER_PAY_PERIOD",
+        "proration": "NONE",
+        "rounding": "HALF_UP",
+        "tiers": [
+          {
+            "min_tenure_months": 0,
+            "minutes_per_period": 120
+          }
+        ]
+      },
+      "year": {
+        "type": "POLICY_YEAR",
+        "starts": "07-01"
+      },
+      "carryover_cap_minutes": 2400,
+      "max_balance_minutes": 2880,
+      "allow_negative": true,
+      "routing": {
+        "skip_level_over_days": null,
+        "hr_over_days": 3
+      }
+    }
+  ]
+}

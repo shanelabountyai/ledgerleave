@@ -1,0 +1,55 @@
+{
+  "asof": "2025-12-31",
+  "counts": {
+    "delegations": 14,
+    "employees": 50,
+    "hourly": 15,
+    "opening_rows": 86,
+    "org_changes": 11,
+    "request_events": 813,
+    "requests": 389,
+    "requests_by_type": {
+      "PTO": 260,
+      "SICK": 129
+    },
+    "timesheet_rows": 726
+  },
+  "generator": "tools/build_fixtures.py",
+  "ledger_start": "2024-01-01",
+  "seed": 20261025,
+  "sha256": {
+    "assignments.csv": "12d117c04fed959d1b770eb806315b5b89a926202892e912f358fc41b992af19",
+    "delegations.csv": "ff194bd28b90a512baa329234c9689782ec129b792a755d41d7121ca3d55d8c4",
+    "employees.csv": "05402a209590594e16921302fc83bae2579b47351981109d81756f9466fb8842",
+    "holidays.csv": "47e928e4a4efed89aa5cddd983ce89f634adee47a80ca458d3efb95dcf2481f5",
+    "opening_balances.csv": "6fe72d09e7e3b9e02e204ec108805ed6a25c3845c229d0b6724b8c656353fe64",
+    "org_changes.csv": "85272bfd5f43022c4b2524b5197f7549580543ec4fe9f3f5438f7bb2c73215f3",
+    "policies.json": "749f50b88106b4f2291b2e0819c6a5b6a0003c96a88e0f23fca6b6eac634f18c",
+    "request_events.csv": "1894fa4b1358d2b37c0d562c78fd05fe87d5843587df018608b9cb39f395ed3e",
+    "requests.csv": "529e33425a6be2800728a9de172495b26cb45483bd41c1615f3ad83cf9ec57d9",
+    "timesheets.csv": "6b8888122d7934b71ceaf93a0eda8e8fd658221bcd4e6a5db2edc0ba3665a094"
+  },
+  "traps": {
+    "S01": 1,
+    "S02": 1,
+    "S03": 1,
+    "S04": 1,
+    "S05": 1,
+    "S06": 1,
+    "S07": 1,
+    "S08": 1,
+    "S09": 1,
+    "S10": 1,
+    "S11": 1,
+    "S12": 1,
+    "S13": 1,
+    "S14": 1,
+    "S15": 1,
+    "S16": 1,
+    "S17": 1,
+    "S18": 1,
+    "S19": 1,
+    "S20": 1,
+    "T8_INSUFFICIENT_BALANCE": 33
+  }
+}
