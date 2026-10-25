@@ -17,7 +17,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ledgerleave_test?connection_limit=10&pool_timeout=20
       DIRECT_URL: postgresql://postgres:postgres@localhost:5432/ledgerleave_test?connection_limit=10&pool_timeout=20
       AUTH_SECRET: ci-only-secret-not-for-real-use-0123456789abc
-      APP_URL: http://localhost:6300
+      APP_URL: http://localhost:7300
     services:
       postgres:
         image: postgres:17

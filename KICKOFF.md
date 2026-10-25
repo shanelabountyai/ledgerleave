@@ -11,22 +11,22 @@ Read, in order, from the kit: CLAUDE.md, prd-ledgerleave.md, docs/decisions.md
 (authoritative), docs/domain-brief.md, docs/portfolio-overlap.md, docs/phase-1-tasks.md.
 
 Steps, in order:
-1. Port check. If ~/.claude/CLAUDE.md is reachable, read its port table; if 6300 is claimed,
+1. Port check. If ~/.claude/CLAUDE.md is reachable, read its port table; if 7300 is claimed,
    stop and tell me which port is free. If the file is not reachable, write
-   "port 6300 unverified against the port table" in NEXT.md and continue.
+   "port 7300 unverified against the port table" in NEXT.md and continue.
 2. Clone the template with shared history (NOT GitHub's "Use this template" button):
      git clone https://github.com/shanelabountyai/saas-foundation.git ledgerleave
      cd ledgerleave && git remote rename origin template
      git checkout -B main v1.3.0
      npm ci
-     npm run new-project -- ledgerleave 6300
+     npm run new-project -- ledgerleave 7300
    Do not run new-project twice. Copy the kit in: CLAUDE.md, KICKOFF.md, NEXT.md,
    prd-ledgerleave.md, docs/*.md, tools/*.py, fixtures/samples/, .claude/settings.json
    (merge the model pin; keep anything the template put there). Add the scope-honesty
    banner from the PRD to README.md verbatim.
 3. Add the clone row to saas-foundation/CLONES.md in a separate branch of the template
    repo (v1.3.0, today's date, "PTO & approvals: ledger-derived accrual engine, data-driven
-   approval routing with delegation; port 6300; public; synthetic only; not deployed")
+   approval routing with delegation; port 7300; public; synthetic only; not deployed")
    and show me the diff; do not push it until I say so. Put
    ?connection_limit=10&pool_timeout=20 on the local DATABASE_URLs. Confirm vercel.json
    has the house ignoreCommand. Add the ~/.claude/CLAUDE.md port row only if that file is
@@ -85,7 +85,7 @@ merge the PR.
 ## Still to do by hand
 
 - Review and merge the kickoff PR; then merge the `CLONES.md` row in saas-foundation.
-- `~/.claude/CLAUDE.md`: add the port row (ledgerleave → 6300) if the session could not.
+- `~/.claude/CLAUDE.md`: add the port row (ledgerleave → 7300) if the session could not.
 - Build-log card #14: name **Ledgerleave**, PRD and repo links, status `in progress`, chips per `docs/portfolio-overlap.md` "Suggested card chips".
 - Neon and Vercel only if this is ever deployed (not planned; synthetic data).
 - Decide O-1..O-10 when they come up; defaults are in force.
