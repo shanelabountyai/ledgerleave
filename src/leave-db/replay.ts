@@ -22,6 +22,7 @@ import { enqueue } from '@/modules/notifications/outbox';
 import { type Employee, ORG_CHANGE_FIELDS, Org, type OrgChange, type OrgChangeField } from '@/routing/org';
 import { ACTIONS, type Action, type Effects, type Request, type RequestEvent, type RequestState } from '@/routing/requests';
 import type { Step } from '@/routing/route';
+import { assertWritable } from './archive';
 import { type Notification, eventOutcome, notificationsFor } from './notify';
 import './templates'; // registers APPROVAL_REQUESTED / APPROVED / DENIED into the outbox module
 
@@ -69,6 +70,19 @@ function oneOf<T extends string>(v: string, allowed: readonly T[], what: string)
   return v as T;
 }
 
+/** The org chart as the routing engine reads it (employees + org changes), and each employee's outbox email. */
+export async function loadOrgFromDb(tx: Pick<Tx, 'employee' | 'orgChange'>, orgId: string): Promise<{ org: Org; emails: ReadonlyMap<string, string> }> {
+  const employeeRows = await tx.employee.findMany({ where: { orgId }, orderBy: { employeeId: 'asc' } });
+  const employees: Employee[] = employeeRows.map((e) => ({
+    id: e.employeeId, name: e.name, title: e.title, dept: e.dept, managerId: e.managerId ?? '', employmentType: e.employmentType, roles: e.roles,
+    hireDate: calendarDay(e.hireDate), termDate: e.termDate === null ? '' : calendarDay(e.termDate),
+  }));
+  const changes: OrgChange[] = (await tx.orgChange.findMany({ where: { orgId } })).map((c) => ({
+    effective: calendarDay(c.effective), employeeId: c.employeeId, field: oneOf<OrgChangeField>(c.field, ORG_CHANGE_FIELDS, 'OrgChange.field'), old: c.oldValue, new: c.newValue,
+  }));
+  return { org: new Org(employees, changes), emails: new Map(employeeRows.map((e) => [e.employeeId, e.email])) };
+}
+
 /** Mirrors scripts/leave/load-fixtures.ts, reading the tables instead of the files. */
 export async function loadWorldFromDb(tx: Tx, orgId: string, asOf: CalendarDay): Promise<LoadedDbWorld> {
   const settings = await tx.leaveSettings.findUnique({ where: { orgId } });
@@ -77,15 +91,7 @@ export async function loadWorldFromDb(tx: Tx, orgId: string, asOf: CalendarDay):
   if (!policySet) throw new Error(`org ${orgId} has no PolicySet row`);
   const policyFile = loadPolicyFile(JSON.stringify(policySet.content));
 
-  const employeeRows = await tx.employee.findMany({ where: { orgId }, orderBy: { employeeId: 'asc' } });
-  const employees: Employee[] = employeeRows.map((e) => ({
-    id: e.employeeId, name: e.name, title: e.title, dept: e.dept, managerId: e.managerId ?? '', employmentType: e.employmentType, roles: e.roles,
-    hireDate: calendarDay(e.hireDate), termDate: e.termDate === null ? '' : calendarDay(e.termDate),
-  }));
-  const emails = new Map(employeeRows.map((e) => [e.employeeId, e.email]));
-  const changes: OrgChange[] = (await tx.orgChange.findMany({ where: { orgId } })).map((c) => ({
-    effective: calendarDay(c.effective), employeeId: c.employeeId, field: oneOf<OrgChangeField>(c.field, ORG_CHANGE_FIELDS, 'OrgChange.field'), old: c.oldValue, new: c.newValue,
-  }));
+  const { org, emails } = await loadOrgFromDb(tx, orgId);
   const assignments: Assignment[] = (await tx.policyAssignment.findMany({ where: { orgId }, orderBy: [{ employeeId: 'asc' }, { leaveType: 'asc' }, { start: 'asc' }] })).map((a) => ({
     employeeId: a.employeeId, leaveType: a.leaveType, policyId: a.policyId, start: calendarDay(a.start), end: a.end === null ? null : calendarDay(a.end),
   }));
@@ -102,7 +108,7 @@ export async function loadWorldFromDb(tx: Tx, orgId: string, asOf: CalendarDay):
   const opening = (await tx.openingBalance.findMany({ where: { orgId } })).map((o) => ({ employeeId: o.employeeId, leaveType: o.leaveType, minutes: o.minutes }));
 
   const world: World = {
-    policyFile, org: new Org(employees, changes), assignments, holidays, timesheets, delegations, requests, events, opening,
+    policyFile, org, assignments, holidays, timesheets, delegations, requests, events, opening,
     ledgerStart: calendarDay(settings.ledgerStart), asOf,
   };
   return { world, emails };
@@ -127,6 +133,7 @@ interface ObservedEvent {
 
 /** Run the engine over the org's tables and store the missing derived rows. Call inside a transaction that holds the org lock. */
 export async function replay(tx: Tx, orgId: string, asOf: CalendarDay, opts: RunOptions = {}): Promise<ReplayResult> {
+  await assertWritable(tx, orgId); // D-47: every derived write goes through here; an archived org takes none
   const { world, emails } = await loadWorldFromDb(tx, orgId, asOf);
   const observed: ObservedEvent[] = [];
   const sim = new Simulation(world, {

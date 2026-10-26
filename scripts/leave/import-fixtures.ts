@@ -16,6 +16,7 @@ import { ORG_CHANGE_FIELDS } from '../../src/routing/org';
 import { ACTIONS } from '../../src/routing/requests';
 import { cmpStr } from '../../src/routing/org';
 import { parseCsv } from './csv';
+import { assertWritable } from '../../src/leave-db/archive';
 
 export const FIXTURE_ORG_SLUG = 'ledgerleave-fixture';
 
@@ -59,6 +60,7 @@ export async function importFixtures(dir: string, orgSlug = FIXTURE_ORG_SLUG): P
   const orgId = org.id;
 
   return db.$transaction(async (tx) => {
+    await assertWritable(tx, orgId); // D-47: an archived org takes no import either
     await tx.leaveSettings.upsert({
       where: { orgId },
       create: { orgId, ledgerStart: day(manifest.ledger_start, 'MANIFEST.ledger_start'), fixtureSeed: manifest.seed, fixtureAsOf: day(manifest.asof, 'MANIFEST.asof') },

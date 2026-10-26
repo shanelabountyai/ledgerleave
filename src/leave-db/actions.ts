@@ -13,6 +13,8 @@ import { LEAVE_TYPES } from '@/accrual/policy';
 import { db } from '@/core/db';
 import type { Prisma } from '@/generated/prisma/client';
 import { type Action } from '@/routing/requests';
+import { assertWritable } from './archive';
+import { ActionRefused } from './errors';
 import { type EventOutcome, REPLAY_TX, type ReplayResult, type Tx, lockOrg, replay } from './replay';
 
 export interface ActionOutcome {
@@ -25,12 +27,7 @@ export interface ActionOutcome {
   readonly replay: ReplayResult;
 }
 
-export class ActionRefused extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ActionRefused';
-  }
-}
+export { ActionRefused }; // moved to ./errors (it is the foundation's Refused now, D-42)
 
 async function nextOrdinal(tx: Tx, orgId: string, on: string): Promise<number> {
   const last = await tx.requestCommand.findFirst({ where: { orgId, on }, orderBy: { ordinal: 'desc' }, select: { ordinal: true } });
@@ -85,6 +82,7 @@ export async function submitRequest(input: SubmitInput): Promise<ActionOutcome> 
   if (end < start) throw new ActionRefused('end is before start');
   return db.$transaction(async (tx) => {
     await lockOrg(tx, input.orgId);
+    await assertWritable(tx, input.orgId);
     const emp = await tx.employee.findUnique({ where: { orgId_employeeId: { orgId: input.orgId, employeeId: input.employeeId } } });
     if (!emp) throw new ActionRefused(`unknown employee ${input.employeeId}`);
     const requestId = await nextRequestId(tx, input.orgId);
@@ -114,6 +112,7 @@ async function command(i: DecisionInput, action: Exclude<Action, 'SUBMIT'>, targ
   if (action === 'REASSIGN' && target === '') throw new ActionRefused('REASSIGN needs a target approver');
   return db.$transaction(async (tx) => {
     await lockOrg(tx, i.orgId);
+    await assertWritable(tx, i.orgId);
     const req = await tx.leaveRequest.findUnique({ where: { orgId_requestId: { orgId: i.orgId, requestId: i.requestId } } });
     if (!req) throw new ActionRefused(`unknown request ${i.requestId}`);
     if (!(await tx.employee.findUnique({ where: { orgId_employeeId: { orgId: i.orgId, employeeId: i.actor } } }))) throw new ActionRefused(`unknown actor ${i.actor}`);
