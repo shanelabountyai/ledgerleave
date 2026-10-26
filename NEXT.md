@@ -1,5 +1,23 @@
 # NEXT
 
+## ▶ State: follow-up D-53 on branch `followups` (PR into `kickoff`; PR #1 untouched, nothing merged by the agent)
+
+Cloud session 2026-10-26 (Claude Opus 5.5), owner decision: **O-14 gets the same fix as O-11.**
+
+| What | Result |
+|---|---|
+| Decision | **D-53** in `docs/decisions.md`; O-14 closed. R7″: after `DELEGATION_DEPTH_EXCEEDED`, R7 with every **delegator on the chain** excluded (the step's approver and each person reached by active delegations while they are themself delegating); HR holders by id, then the CEO; only if nobody is left, the step's own approver with the **existing** `FALLBACK_TO_DELEGATOR` (same reason as D-44, so no new code; neutral for `stepRequiresHr`). The CEO stage is kept here, unlike D-44, because this delegator need not hold HR. `UNROUTABLE` can no longer happen on this path. |
+| Oracle | `tools/leavelib.py` first; golden **GR-18** (3 parts: next HR holder / CEO / delegator) — all three fail against the old R7; `golden_answers.py` OK |
+| Fixtures | regenerated (`build_fixtures.py --seed 20261025`, `reference_leave.py --write-expected`): **0 of 14 files moved**; `ledger.csv` `86ab4ebe…`, `expected_balances.csv` `23fe55b4…`, `expected_requests.csv` `90cdd09a…`; `verify_fixtures.py` OK |
+| TypeScript | `src/routing/route.ts` (`delegatorsOnChain`, `fallbackSkippingDelegators`); 5 tests in `routing.test.ts` (GR-18 ×3, a delegation cycle, the CEO as requester) |
+| Re-proved | `leave:eval` 0 diffs (5057 / 198 / 389) · `ledger:verify` 198/0 · `engine:lint` 0 · `fixtures:check` OK · DB import → replay 6688 → replay 0 → `ledger:verify --db` 198/0 → `leave:eval --db` 0 diffs ×3, ledger hash `d2a090f80d2b…` unchanged · `npm test` **413/413** · typecheck clean |
+| Not run locally | Playwright (engine-only change; CI runs the 16 specs) |
+| CI | `5f3cb51` (PR #2): https://github.com/shanelabountyai/ledgerleave/actions/runs/40371083892 — **green** (`ci` incl. Playwright, `modules-removed`) |
+
+Nuance left as is (stated in D-53's scope, not a new open item): only delegators **on the step's chain** are skipped; an HR holder away on an unrelated delegation can still be chosen as the fallback — the existing test "a fallback approver is never delegated (R7)" pins that.
+
+---
+
 ## ▶ State: decisions pass + Phase 3 complete on branch `kickoff` (PR #1, never merged by the agent). Stopped at the Phase 3 gate; the PRD names no Phase 4, so `docs/CLOSEOUT.md` is a draft to review.
 
 Cloud session 2026-10-26 (Claude Opus 5.5). Owner decisions D-42..D-47 recorded and applied; build defaults D-48..D-52; every Phase 3 number in `docs/EVAL.md` ("Decisions pass + Phase 3"); tasks ticked with what changed in `docs/phase-3-tasks.md`.
@@ -41,7 +59,7 @@ No red runs this session. Locally, the e2e walk found two real defects before CI
 
 ### Open / by hand (owner)
 
-- **O-14** (new): the `DELEGATION_DEPTH_EXCEEDED` fallback has O-11's shape; fixture count 0; not changed (D-44 was scoped to O-11).
+- **O-14**: closed by D-53 on branch `followups` (see the top of this file).
 - The template `/onboarding` list still shows archived orgs (template-owned); `/orgs` hides them.
 - Review PR #1; delete `proof/cap-2401`; run `prisma migrate diff` on the Mac; port row 7300 in `~/.claude/CLAUDE.md`; reuse scan; build-log card. Full list in `docs/CLOSEOUT.md`.
 

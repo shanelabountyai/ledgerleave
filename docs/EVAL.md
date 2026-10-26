@@ -118,3 +118,16 @@ Changing one number in a copy of `policies.json`, with **no code change**:
 ## Not generated (say so in any write-up)
 
 Half days, overlapping requests, requests before hire or after termination, zero-working-day requests, HR adjustments other than opening balances, policy edits mid-window, several delegations by one approver at once, delegations to inactive people, more than one HR revoke (brief §4). Each is a candidate for a second seed.
+
+## Follow-up — D-53, the O-14 fix (measured 2026-10-26, branch `followups`)
+
+The owner decided O-14 the same way as O-11: the `DELEGATION_DEPTH_EXCEEDED` fallback skips every delegator on the chain (R7″). Decisions first, oracle second, TypeScript third; every proof re-run after the engines changed.
+
+| Measure | Value | Command |
+|---|---|---|
+| Oracle | `golden_answers.py` OK, now GA-01..GA-20 + **GR-01..GR-18**; GR-18's three parts all print `BAD` against the old R7 (all three landed on H7) | `python3 -I tools/golden_answers.py` |
+| Fixtures | `build_fixtures.py --seed 20261025` + `reference_leave.py --write-expected`: **0 of 14 files moved** (`ledger.csv` `86ab4ebe…`, `expected_balances.csv` `23fe55b4…`, `expected_requests.csv` `90cdd09a…`, `MANIFEST.json` `9cf46505…`); `verify_fixtures.py` OK; fixture count of a depth-exceeded fallback landing on a delegator: 0 (R-0008, R-0079 still fall back to E006) | `npm run fixtures:check` |
+| Phase 1 re-proved | `leave:eval` **0 diffs** (5057 / 198 / 389); `ledger:verify` 198 rows 0 diffs; `engine:lint` 0 hits | `npm run leave:eval` … |
+| Phase 2 re-proved | import 813 commands; replay 6688 rows; second replay **0**; `ledger:verify --db` 198 rows 0 diffs; `leave:eval --db` 0 diffs ×3; ledger hash `d2a090f80d2b…` — unchanged | `leave:*:test -- --org followup-d53` |
+| Suite | **413 tests / 52 files** green locally (408 + GR-18 ×3, a delegation cycle, the CEO-as-requester case) | `npm test` |
+

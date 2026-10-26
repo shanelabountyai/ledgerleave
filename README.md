@@ -18,7 +18,7 @@ The `SICK_STD` policy is a **sample**: shaped like a statutory accrual floor (fi
 | `npm run ledger:verify` | recomputes every employee-year balance from `fixtures/ledger.csv` alone and diffs `expected_balances.csv` |
 | `npm run leave:route -- --employee <id> --start <d> --end <d> --submit <d> [--type PTO\|SICK]` | prints working days, minutes, the predicted chain with reason codes and the balance check; writes nothing |
 | `npm run engine:lint` | fails on any clock, database, network, model, random or float token under `src/accrual/` and `src/routing/`, on the D-7 date bans anywhere this clone writes code, and on a bad vocabulary value in `fixtures/policies.json` |
-| `npm run fixtures:check` | `tools/verify_fixtures.py` regenerates the fixtures with the pinned seed and compares every sha256; `tools/golden_answers.py` re-derives GA-01..GA-20 and GR-01..GR-17; the working tree under `fixtures/` must be clean |
+| `npm run fixtures:check` | `tools/verify_fixtures.py` regenerates the fixtures with the pinned seed and compares every sha256; `tools/golden_answers.py` re-derives GA-01..GA-20 and GR-01..GR-18; the working tree under `fixtures/` must be clean |
 | `npm run leave:import` / `leave:replay` / `ledger:verify:db` / `leave:eval:db` | Phase 2: the fixtures into an org's tables, replayed through the engines, and the three reference files rebuilt from rows alone (0 diffs) |
 | `npm run leave:seed:hand [-- <slug>]` | the brief §9 hand org (H1–H10) as rows, for a local look around; link demo accounts to employees from the HR console |
 

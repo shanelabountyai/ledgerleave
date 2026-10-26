@@ -31,7 +31,7 @@ export const ROUTING_CODES = [
   'DELEGATE_LACKS_HR_ROLE',
   'FALLBACK_TO_HR',
   'FALLBACK_TO_CEO',
-  'FALLBACK_TO_DELEGATOR', // D-44
+  'FALLBACK_TO_DELEGATOR', // D-44, D-53
   'UNROUTABLE',
   'DUPLICATE_APPROVER_COLLAPSED',
   'EMPTY_CHAIN_TO_HR',
@@ -105,6 +105,44 @@ function fallbackSkippingDelegator(org: Org, requester: string, delegator: strin
 }
 
 /**
+ * D-53: the step's approver and everyone reached from it by delegations active on d, while that person is themself
+ * delegating. Stops at the first person not delegating, or at a repeat.
+ */
+function delegatorsOnChain(delegations: readonly Delegation[], start: string, d: string): string[] {
+  const out: string[] = [];
+  let x = start;
+  while (x !== '' && !out.includes(x)) {
+    const next = delegateOf(delegations, x, d);
+    if (next === '') break;
+    out.push(x);
+    x = next;
+  }
+  return out;
+}
+
+/**
+ * R7″ (D-53): after DELEGATION_DEPTH_EXCEEDED, R7 with every delegator on the chain excluded at every stage (HR holders
+ * by id, then the CEO); only if nobody is left, the step's own approver — the first delegator — with
+ * FALLBACK_TO_DELEGATOR (neutral for stepRequiresHr: the step keeps the basis it was selected on). That approver is
+ * active (R3) and never the requester (R4), so this always resolves.
+ */
+function fallbackSkippingDelegators(org: Org, requester: string, delegators: readonly string[], d: string, codes: RoutingCode[]): string {
+  for (const h of org.hrHolders(d)) {
+    if (h !== requester && !delegators.includes(h)) {
+      codes.push('FALLBACK_TO_HR');
+      return h;
+    }
+  }
+  const ceo = org.ceo();
+  if (ceo !== requester && !delegators.includes(ceo) && org.isActive(ceo, d)) {
+    codes.push('FALLBACK_TO_CEO');
+    return ceo;
+  }
+  codes.push('FALLBACK_TO_DELEGATOR');
+  return delegators[0]!;
+}
+
+/**
  * The manager of `id` as of d. An inactive manager is skipped upward, repeatedly (R3). The CEO's manager is the HR
  * primary (R2); with no HR holder at all, the fallback. Returns [approver, isFallback].
  */
@@ -173,7 +211,7 @@ export function route(input: RouteInput): Step[] {
       if (dlg !== '') {
         if (delegateOf(delegations, dlg, submit) !== '' || !org.isActive(dlg, submit)) {
           codes.push('DELEGATION_DEPTH_EXCEEDED');
-          appr = fallback(org, requester, submit, codes);
+          appr = fallbackSkippingDelegators(org, requester, delegatorsOnChain(delegations, appr, submit), submit, codes);
           kept = appr !== '';
         } else if (stepRequiresHr(codes) && !org.rolesOf(dlg, submit).has(HR_ROLE)) {
           codes.push('DELEGATE_LACKS_HR_ROLE');
