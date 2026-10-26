@@ -437,6 +437,18 @@ def _fallback(org: Org, requester: str, d: str, codes: list[str]) -> str:
     return ""
 
 
+def _fallback_skipping_delegator(org: Org, requester: str, delegator: str, d: str, codes: list[str]) -> str:
+    """R7' (D-44): after DELEGATE_LACKS_HR_ROLE, the first HR holder by id who is neither the requester nor the
+    approver who delegated the step away; only if none exists, that delegator (FALLBACK_TO_DELEGATOR). The delegator
+    was selected as an HR holder and is never the requester (R4 ran first), so this always resolves."""
+    for h in org.hr_holders(d):
+        if h != requester and h != delegator:
+            codes.append("FALLBACK_TO_HR")
+            return h
+    codes.append("FALLBACK_TO_DELEGATOR")
+    return delegator
+
+
 def _manager_of(org: Org, eid: str, requester: str, d: str, codes: list[str]) -> tuple[str, bool]:
     """The manager of eid as of d. The CEO's manager is the HR primary (R2). An inactive manager is skipped
     upward (R3). Returns (approver, is_fallback)."""
@@ -495,7 +507,7 @@ def route(org: Org, table: RoutingTable, policy: Policy, delegations: list[Deleg
                     kept = bool(appr)
                 elif step_requires_hr(codes) and HR_ROLE not in org.roles_of(dlg, submit):
                     codes.append("DELEGATE_LACKS_HR_ROLE")
-                    appr = _fallback(org, requester, submit, codes)
+                    appr = _fallback_skipping_delegator(org, requester, appr, submit, codes)
                     kept = bool(appr)
                 elif dlg == requester:
                     codes.append("DELEGATED")
@@ -751,6 +763,12 @@ class Simulation:
             rs.chain = chain_str(rs.steps)
             rs.state = "SUBMITTED"
             rs.log.append(f"SUBMIT:{ev.actor}:{ev.on}:CHAIN_FROZEN")
+            # D-45: overlap with the same employee's own PENDING or APPROVED request, checked before A8
+            if any(o.req.id != r.id and o.req.employee_id == r.employee_id and o.state in ("PENDING", "APPROVED")
+                   and o.req.start <= r.end and r.start <= o.req.end for o in self.reqs.values()):
+                rs.state, rs.final_code = "DENIED", "OVERLAPPING_REQUEST"
+                rs.log.append(f"SYSTEM_DENY:SYSTEM:{ev.on}:OVERLAPPING_REQUEST")
+                return
             if not pol.allow_negative and self.ledger.available(r.employee_id, r.leave_type) - rs.minutes < 0:
                 rs.state, rs.final_code = "DENIED", "INSUFFICIENT_BALANCE"
                 rs.log.append(f"SYSTEM_DENY:SYSTEM:{ev.on}:INSUFFICIENT_BALANCE")

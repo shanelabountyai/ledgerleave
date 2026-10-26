@@ -1,7 +1,7 @@
 """Ledgerleave — kickoff answer key (test oracle, never product code).
 
 Re-derives every golden case in docs/domain-brief.md §8 (GA-01..GA-20, accrual) and §9
-(GR-01..GR-15, routing) from tools/leavelib.py and checks each against the value worked by
+(GR-01..GR-17, routing) from tools/leavelib.py and checks each against the value worked by
 hand in the brief. Prints one line per case and ends with OK, or exits 1 naming the first
 mismatch.
 
@@ -250,6 +250,30 @@ def main() -> int:
            ["SUBMIT:H4:2025-05-05:CHAIN_FROZEN", "VOID_APPROVE:H2:2025-05-08:APPROVER_NOT_STEP_APPROVER", "APPROVE:H3:2025-05-09:MANAGER"], "APPROVED",
            "MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H7[HR_ROLE_HOLDER]",
            ["VOID_APPROVE:H7:2025-05-08:APPROVER_INELIGIBLE_ROLE_REVOKED", "REASSIGN:H8:2025-05-09:STEP_REASSIGNED->H8", "APPROVE:H8:2025-05-12:HR"], "APPROVED"))
+
+    # GR-16 (D-44): the DELEGATE_LACKS_HR_ROLE fallback skips the delegator; the delegator only when nobody else holds HR
+    dlg_h7 = [("H7", "H5", "2025-05-01", "2025-05-09")]
+    org_b = L.Org(H, [L.OrgChange("2025-05-01", "H8", "ROLE_REVOKED", "HR", "HR")])
+    check("GR-16", "HR primary delegates the HR step to a non-HR peer: next HR holder, else the delegator with a code",
+          (r("H4", 11, dlg=dlg_h7), r("H4", 11, dlg=dlg_h7, o=org_b)),
+          ("MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H8[HR_ROLE_HOLDER,DELEGATE_LACKS_HR_ROLE,FALLBACK_TO_HR]",
+           "MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H7[HR_ROLE_HOLDER,DELEGATE_LACKS_HR_ROLE,FALLBACK_TO_DELEGATOR]"))
+    # GR-17 (D-45): a submit overlapping the employee's own PENDING or APPROVED request is denied before A8
+    assigns17 = assigns + [L.Assignment("H4", "SICK", "SICK_STD", "2018-01-08", "")]
+    s = run(world(H, assigns17, opening=[(h.id, "PTO", 2400) for h in H],
+                  requests=[("P1", "H4", "PTO", "2025-05-19", "2025-05-20", D), ("P2", "H4", "SICK", "2025-05-20", "2025-05-21", "2025-05-07"),
+                            ("P3", "H4", "PTO", "2025-05-21", "2025-05-22", "2025-05-07"), ("P4", "H4", "PTO", "2025-05-19", "2025-05-19", "2025-05-09"),
+                            ("P5", "H4", "PTO", "2025-05-22", "2025-05-22", "2025-05-09")],
+                  events=[("P1", 1, D, "H4", "SUBMIT"), ("P1", 2, "2025-05-06", "H3", "APPROVE"), ("P2", 1, "2025-05-07", "H4", "SUBMIT"),
+                          ("P3", 1, "2025-05-07", "H4", "SUBMIT"), ("P1", 3, "2025-05-08", "H4", "CANCEL"),
+                          ("P4", 1, "2025-05-09", "H4", "SUBMIT"), ("P5", 1, "2025-05-09", "H4", "SUBMIT")],
+                  asof="2025-05-09"))
+    lab = lambda q: f"PENDING_{q.step + 1}" if q.state == "PENDING" else q.state  # noqa: E731
+    p = s.reqs
+    check("GR-17", "overlap with own approved (other type) or pending request -> system denial; denied/cancelled ones do not block",
+          (lab(p["P2"]), p["P2"].final_code, p["P2"].chain, p["P2"].log, lab(p["P3"]), lab(p["P4"]), lab(p["P5"]), p["P5"].final_code),
+          ("DENIED", "OVERLAPPING_REQUEST", "MANAGER:H3[MANAGER_OF_REQUESTER]",
+           ["SUBMIT:H4:2025-05-07:CHAIN_FROZEN", "SYSTEM_DENY:SYSTEM:2025-05-07:OVERLAPPING_REQUEST"], "PENDING_1", "PENDING_1", "DENIED", "OVERLAPPING_REQUEST"))
 
     print("\n".join(out))
     print()
