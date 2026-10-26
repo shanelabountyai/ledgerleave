@@ -53,7 +53,7 @@ Green: `d09b02b` (2.1–2.3) run 40320500813; `96536b9` (2.4–2.9) run 40321952
 | `f8a1935` 2.1/2.2 schema, migration, tests | https://github.com/shanelabountyai/ledgerleave/actions/runs/40319426296 | **red**: typecheck (fixed, see above) |
 | `d09b02b` 2.1–2.3 + engine ordinal/openAsOfDay | https://github.com/shanelabountyai/ledgerleave/actions/runs/40320500813 | green |
 | `96536b9` 2.4–2.9 (replay, outbox, verify/eval --db, actions, CI steps) | https://github.com/shanelabountyai/ledgerleave/actions/runs/40321952682 | green |
-| gate docs commit | see the last row the session adds below | — |
+| `b2dd3ab` Phase 2 gate docs | https://github.com/shanelabountyai/ledgerleave/actions/runs/40322972976 | green (`ci` and `modules-removed`) |
 
 ### Still to do by hand (owner)
 
