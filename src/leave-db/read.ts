@@ -142,6 +142,13 @@ export async function inboxFor(orgId: string, employeeId: string): Promise<Reque
   return (await requestViews(orgId, { requestId: { in: ids } })).filter((v) => v.open && v.currentApprover === employeeId);
 }
 
+/** One sentence for an engine verdict, from the stored RequestEvent — a void or ignored event is said, never swallowed. */
+export function describeEvent(ev: { requestId: string; outcome: string; stateAfter: string; stepAfter: number; finalCodeAfter: string; logLines: readonly string[] }): string {
+  const state = ev.stateAfter === 'PENDING' ? `PENDING_${ev.stepAfter + 1}` : ev.stateAfter;
+  const what = ev.outcome === 'APPLIED' ? `${ev.requestId}: ${state}${ev.finalCodeAfter && ev.finalCodeAfter !== state ? ` (${ev.finalCodeAfter})` : ''}` : `${ev.requestId}: ${ev.outcome}`;
+  return `${what} — ${ev.logLines.join('; ')}`;
+}
+
 // ------------------------------------------------------------------------------------------------------- ledger
 
 export interface LedgerLine {

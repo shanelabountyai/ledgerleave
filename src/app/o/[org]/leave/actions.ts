@@ -3,7 +3,7 @@
 // Engine commands act as the signed-in user's linked employee (D-42, D-50) on the org's today (D-43); ids are row
 // uuids looked up INSIDE the org, so another org's id and a missing id both end in notFound() (INV-02/03/04).
 import { revalidatePath } from 'next/cache';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { z } from 'zod';
 import { orgAction, ref } from '@/core/authz/action';
 import type { OrgCtx } from '@/core/authz/guards';
@@ -19,10 +19,12 @@ import { todayFor } from '@/leave-db/today';
 const DAY = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Dates are YYYY-MM-DD.');
 const base = (ctx: OrgCtx) => `/o/${ctx.slug}/leave`;
 
-/** One sentence for the form, from the engine's verdict — a void or ignored event is shown, never swallowed. */
-function said(o: ActionOutcome): { notice: string } {
-  const what = o.outcome === 'APPLIED' ? `${o.requestId}: ${o.state}${o.finalCode && o.finalCode !== o.state ? ` (${o.finalCode})` : ''}` : `${o.requestId}: ${o.outcome}`;
-  return { notice: `${what} — ${o.logLines.join('; ')}` };
+/**
+ * After an engine command, show the request with the stored verdict of THIS command (`?event=<seq>`): the card the
+ * button lived on may leave the list it was in (an approved request leaves the inbox), so the outcome gets a page.
+ */
+function shown(ctx: OrgCtx, o: ActionOutcome): never {
+  redirect(`${base(ctx)}/requests/${o.requestId}?event=${o.seq}`);
 }
 
 async function requestRow(ctx: OrgCtx, id: string) {
@@ -48,8 +50,7 @@ export const submitLeave = orgAction(
     const me = await requireEmployee(ctx.orgId, ctx.userId);
     const on = await todayFor(ctx.orgId);
     const o = await submitRequest({ orgId: ctx.orgId, employeeId: me.employeeId, leaveType: i.leaveType, start: i.start, end: i.end, on });
-    revalidatePath(base(ctx));
-    return said(o);
+    shown(ctx, o);
   },
 );
 
@@ -58,8 +59,7 @@ const decide = (fn: typeof approveRequest) =>
     const r = await requestRow(ctx, i.request);
     const me = await requireEmployee(ctx.orgId, ctx.userId);
     const o = await fn({ orgId: ctx.orgId, requestId: r.requestId, actor: me.employeeId, on: await todayFor(ctx.orgId) });
-    revalidatePath(base(ctx));
-    return said(o);
+    shown(ctx, o);
   });
 
 export const approveLeave = decide(approveRequest);
@@ -72,8 +72,7 @@ export const reassignLeave = orgAction(null, z.object({ request: ref('leaveReque
   const target = await employeeRow(ctx, i.approver);
   const me = await requireEmployee(ctx.orgId, ctx.userId);
   const o = await reassignStep({ orgId: ctx.orgId, requestId: r.requestId, actor: me.employeeId, on: await todayFor(ctx.orgId), target: target.employeeId });
-  revalidatePath(base(ctx));
-  return said(o);
+  shown(ctx, o);
 });
 
 async function memberUser(ctx: OrgCtx, userId: string) {
