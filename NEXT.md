@@ -1,6 +1,53 @@
 # NEXT
 
-## ▶ State: Phase 2 complete on branch `kickoff` (PR #1, never merged by the agent). Stopped at the Phase 2 gate; Phase 3 not started — `docs/phase-3-tasks.md` is a draft to review.
+## ▶ State: decisions pass + Phase 3 complete on branch `kickoff` (PR #1, never merged by the agent). Stopped at the Phase 3 gate; the PRD names no Phase 4, so `docs/CLOSEOUT.md` is a draft to review.
+
+Cloud session 2026-10-26 (Claude Opus 5.5). Owner decisions D-42..D-47 recorded and applied; build defaults D-48..D-52; every Phase 3 number in `docs/EVAL.md` ("Decisions pass + Phase 3"); tasks ticked with what changed in `docs/phase-3-tasks.md`.
+
+### Decisions applied (owner, 2026-10-26)
+
+| Item | D | Result |
+|---|---|---|
+| 7 O-12 account ↔ employee | D-42 | nullable unique `Employee.userId`, set only by the audited HR action; email match only suggests |
+| 8 O-13 "today" | D-43 | `LeaveSettings.timeZone` (IANA, default America/Chicago); `src/leave-db/today.ts` is the only converter (grep test) |
+| 9 O-11 fallback skips the delegator | D-44 | R7′ + `FALLBACK_TO_DELEGATOR` in `leavelib.py` then TS; golden **GR-16**; fixture hits 0 → regenerated, **0 bytes moved** |
+| 10 O-6 overlap | D-45 | `OVERLAPPING_REQUEST` before A8 in both engines; golden **GR-17**; no fixture overlaps → `leave:eval` still 0 diffs |
+| 11 billing | D-46 | removed by the manifest + `…_remove_billing` migration; drift clean; `modules-removed` green |
+| 17 archive, keep Restrict | D-47 | `OrgArchive` (append-only), `assertWritable` on every write path, delete-org refused via the clone hook, no trigger disabled anywhere |
+
+Fixtures were NOT regenerated in content: the regeneration ran and moved 0 bytes; hashes unchanged (`ledger.csv` `86ab4ebe…`, `expected_balances.csv` `23fe55b4…`, `expected_requests.csv` `90cdd09a…`).
+
+### Re-proved before any Phase 3 code
+
+`leave:eval` 0 diffs (5057 / 198 / 389) · `ledger:verify` 198 rows 0 diffs · `fixtures:check` OK · DB: import → replay 6688 rows → replay 0 → `ledger:verify --db` 198/0 → `leave:eval --db` 0 diffs ×3, ledger hash `d2a090f80d2b…` (same as Phase 2).
+
+### Phase 3 (tasks 3.0–3.8, all ticked)
+
+Server actions (10, INV harness 0 findings) · My leave with preview · inbox · request page · HR console · ledger · nightly close · `/orgs` · e2e GR-15 walk + overlap + archive with axe light/dark (D-48: axe-core from node_modules, no new dependency). **408 tests / 52 files** green locally; **16/16 Playwright specs** green locally (Chromium at `/opt/pw-browsers`) and in CI.
+
+### CI runs this session
+
+| Commit | Run | Result |
+|---|---|---|
+| `b99d7e5` engines D-44/D-45 | https://github.com/shanelabountyai/ledgerleave/actions/runs/40345215197 | green |
+| `6bbb5f3` billing removed, schema, guards | https://github.com/shanelabountyai/ledgerleave/actions/runs/40346598856 | green (`ci`, `modules-removed`) |
+| `02021a5` Phase 3 pages, close, e2e | https://github.com/shanelabountyai/ledgerleave/actions/runs/40350551073 | green (`ci` incl. Playwright, `modules-removed`) |
+
+No red runs this session. Locally, the e2e walk found two real defects before CI saw them: an inline notice vanished with its card (fixed by D-52) and two pages awaited `params` before the guard (FR-06 harness; fixed).
+
+### Sandbox this session
+
+`prisma generate` with `PRISMA_SCHEMA_ENGINE_BINARY=/bin/true`; PostgreSQL 16 local, migrations by `psql -f`; full `npm test`, `next build` and Playwright (preinstalled Chromium) all ran locally. Not runnable here: `prisma migrate deploy/diff` (schema engine 403) and `foundation:check-modules` (no `rsync`) — CI ran both. A parallel session overwrote a shared helper script in the scratchpad; the two affected commit attempts aborted at `git add` and wrote nothing anywhere; ledgerleave's helpers moved to a private folder.
+
+### Open / by hand (owner)
+
+- **O-14** (new): the `DELEGATION_DEPTH_EXCEEDED` fallback has O-11's shape; fixture count 0; not changed (D-44 was scoped to O-11).
+- The template `/onboarding` list still shows archived orgs (template-owned); `/orgs` hides them.
+- Review PR #1; delete `proof/cap-2401`; run `prisma migrate diff` on the Mac; port row 7300 in `~/.claude/CLAUDE.md`; reuse scan; build-log card. Full list in `docs/CLOSEOUT.md`.
+
+---
+
+## Phase 2 record (2026-10-26), kept as written — was: State: Phase 2 complete on branch `kickoff` (PR #1, never merged by the agent). Stopped at the Phase 2 gate; Phase 3 not started — `docs/phase-3-tasks.md` is a draft to review.
 
 Unattended cloud build sessions: Phase 1 on 2026-10-25, Phase 2 on 2026-10-26 (Claude Fable 5.1). Phase 2 decisions D-35..D-41 and open items O-12, O-13 in `docs/decisions.md`; every Phase 2 number in `docs/EVAL.md` ("Phase 2 — the same answers from the database"); tasks ticked with what changed from the draft in `docs/phase-2-tasks.md`.
 

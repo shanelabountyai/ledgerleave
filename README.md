@@ -18,7 +18,13 @@ The `SICK_STD` policy is a **sample**: shaped like a statutory accrual floor (fi
 | `npm run ledger:verify` | recomputes every employee-year balance from `fixtures/ledger.csv` alone and diffs `expected_balances.csv` |
 | `npm run leave:route -- --employee <id> --start <d> --end <d> --submit <d> [--type PTO\|SICK]` | prints working days, minutes, the predicted chain with reason codes and the balance check; writes nothing |
 | `npm run engine:lint` | fails on any clock, database, network, model, random or float token under `src/accrual/` and `src/routing/`, on the D-7 date bans anywhere this clone writes code, and on a bad vocabulary value in `fixtures/policies.json` |
-| `npm run fixtures:check` | `tools/verify_fixtures.py` regenerates the fixtures with the pinned seed and compares every sha256; `tools/golden_answers.py` re-derives GA-01..GA-20 and GR-01..GR-15; the working tree under `fixtures/` must be clean |
+| `npm run fixtures:check` | `tools/verify_fixtures.py` regenerates the fixtures with the pinned seed and compares every sha256; `tools/golden_answers.py` re-derives GA-01..GA-20 and GR-01..GR-17; the working tree under `fixtures/` must be clean |
+| `npm run leave:import` / `leave:replay` / `ledger:verify:db` / `leave:eval:db` | Phase 2: the fixtures into an org's tables, replayed through the engines, and the three reference files rebuilt from rows alone (0 diffs) |
+| `npm run leave:seed:hand [-- <slug>]` | the brief §9 hand org (H1–H10) as rows, for a local look around; link demo accounts to employees from the HR console |
+
+### Screens (Phase 3)
+
+Under `/o/<org>/leave`, for a member whose account an HR action has linked to an employee (D-42): **My leave** (PTO/SICK balance as of the org's today and available, both summed from the ledger on every load; a preview of a request — working days, minutes, the chain it would freeze, the balance and overlap verdicts — before submitting), **Approvals inbox** (requests whose current step names you, and your reports' open requests), a **request page** (the frozen chain with dropped steps struck through, a reassigned step with its routed approver beside it, the event log with void lines, and the verdict of what you just did), the **HR console** (link accounts to employees, the org's time zone, reassign or cancel on behalf, the employee-year table, the outbox with no send button, the policies with their hash and the sample-policy sentence, archive) and a **ledger** per employee with a running balance. "Today" is the org's calendar day in its IANA zone (D-43). An archived org is read-only and hidden from `/orgs` (D-47). Billing was removed (D-46). Numbers on these screens are in `docs/EVAL.md`.
 
 Fixtures are frozen (seed 20261025; hashes in `docs/domain-brief.md` §12). Product code never reads `ledger.csv` or `expected_*.csv`.
 

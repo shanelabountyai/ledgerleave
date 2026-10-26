@@ -63,6 +63,27 @@ Phase 2 feeds the engines from tables instead of files and stores what they retu
 | Live actions (task 2.5) | GR-15 Q1/Q2 reproduced through `submitRequest`/`approveRequest`/`reassignStep` in date order, each its own transaction; 2 void approvals wrote 0 ledger rows and 0 outbox rows; cancel after approval mirrors 2 usage rows; A8 denial at submit with its chain frozen | `tests/integration/leave/actions.test.ts` (9 tests) |
 | Suite | 386 tests in 47 files green locally under `TZ=America/Chicago` (template invariants + engine + 5 Phase 2 files) | `npm test` |
 
+## Decisions pass + Phase 3 — the same answers on screen (measured 2026-10-26, branch `kickoff`)
+
+The owner's decisions of 2026-10-26 (D-42..D-47) were applied before any Phase 3 code, and every Phase 1 and Phase 2 proof was re-run after the engines changed. Then the pages. These numbers say the screens show what the Phase 2 functions return and that the decided rules hold through the browser; they still say nothing about policy fitness (D-24).
+
+| Measure | Value | Command |
+|---|---|---|
+| Oracle after D-44 (R7′) and D-45 (`OVERLAPPING_REQUEST`) | `golden_answers.py` OK, now GA-01..GA-20 + **GR-01..GR-17**; expected files regenerated with `--write-expected`: **0 bytes moved** (`ledger.csv` `86ab4ebe…`, `expected_balances.csv` `23fe55b4…`, `expected_requests.csv` `90cdd09a…`) — fixture counts of `DELEGATE_LACKS_HR_ROLE` and of overlapping requests are both 0 | `python3 -I tools/reference_leave.py --write-expected`, `npm run fixtures:check` |
+| Phase 1 re-proved | `leave:eval` **0 diffs** (5057 / 198 / 389); `ledger:verify` 198 rows 0 diffs; `engine:lint` 0 hits; 176 engine tests (GR-16 ×4, GR-17 ×3 added) | `npm run leave:eval` … |
+| Phase 2 re-proved | import 813 commands; replay 6688 rows; second replay **0**; `ledger:verify --db` 198 rows 0 diffs; `leave:eval --db` 0 diffs ×3; ledger hash `d2a090f80d2b…` — unchanged from Phase 2 | the CI DB steps |
+| D-42 `Employee.userId` | linked only by the audited HR action (`employee.linked`/`unlinked`); a matching email is a suggestion; non-member, second link and unknown employee refused with messages | `tests/integration/leave/owner-decisions.test.ts` |
+| D-43 one converter | the same instant is 2025-05-04 in Chicago and 2025-05-05 in Kiritimati; both sides of midnight in two zones; DST day; a grep proves `formatToParts`/`Intl.DateTimeFormat` appear only in `src/leave-db/today.ts` | `tests/unit/leave/today.test.ts` (7) |
+| D-46 billing removed | 6 manifest paths deleted, 3 marker lines removed, `…_remove_billing` drops 2 tables; `foundation:drift` clean ("modules removed: billing"); CI `modules-removed` green on `6bbb5f3` | `npm run foundation:drift`, CI |
+| D-47 archive | archived org: **4** write paths refused with one message, **0** rows changed (11-table snapshot); `OrgArchive` UPDATE/DELETE refused by trigger; delete-org on an org with history → `Refused` with the archive hint, **0** rows changed; an empty org still deletes; **0** files in `src/`, `scripts/`, `prisma/` disable a trigger | `owner-decisions.test.ts` (10) |
+| Server actions (3.1) | 10 new `'use server'` actions; INV-01/02/03/04/22 harness **0 findings**; GR-15 walked through the actions as signed-in users with the clock pinned per golden day — 2 voids with their codes, reassign, 2 APPROVED; no-employee / not-HR / archived refusals are `{ error }` messages | `tests/invariants/inv-01-04-22-actions.test.ts`, `tests/integration/leave/ui-actions.test.ts` (8) |
+| HR employee-year table (3.4) | **198 rows, 0 diffs** against `expected_balances.csv` (the test reads the oracle file; the page never does) | `tests/integration/leave/read.test.ts` |
+| Ledger page (3.5) | E013 PTO: one `CARRYOVER_RECOMPUTED` row, 2024-12-31, **−960**; its running balance = `balance(E013, PTO, 2024-12-31)` | `read.test.ts` |
+| Request views | **389** requests, 1 open (`PENDING_2`), as brief §11 | `read.test.ts` |
+| Nightly close (3.6) | at 00:30 Chicago on 2025-01-01 the 2024-12-31 forfeitures post once; second run **0 / 0 / 0** inserted; a live action first is still prefix-safe; Honolulu is still on 12-31; an archived org is skipped | `tests/integration/leave/close.test.ts` (4) |
+| Browser walk (3.7) | GR-15: H3 approves, H2's approval of Q1 **VOID `APPROVER_NOT_STEP_APPROVER`**, H7's **VOID `APPROVER_INELIGIBLE_ROLE_REVOKED`**, H8 reassigns and approves, both **APPROVED**; D-45 preview and denial; D-47 archive; axe **0 violations in light and in dark** on 8 page states (inbox, request, HR console, my leave, preview, ledger, archived leave page, `/orgs`) | `npm run test:e2e` — 16/16 specs locally (Chromium from `/opt/pw-browsers`) and in CI |
+| Suite | **408** tests in 52 files green locally under `TZ=America/Chicago` | `npm test` |
+
 ## Fixture hashes (brief §12, `fixtures/MANIFEST.json`)
 
 `npm run fixtures:check` → `OK seed=20261025`. sha256:

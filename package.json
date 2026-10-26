@@ -42,6 +42,7 @@
     "ledger:verify:db": "dotenv -e .env.local -- tsx scripts/leave/verify.ts --db",
     "ledger:verify:db:test": "dotenv -e .env.test -e .env.local -- tsx scripts/leave/verify.ts --db",
     "engine:lint": "tsx scripts/leave/engine-lint.ts",
+    "leave:seed:hand": "dotenv -e .env.local -- tsx scripts/leave/seed-hand-org.ts",
     "fixtures:check": "python3 -I tools/verify_fixtures.py && python3 -I tools/golden_answers.py && git diff --exit-code fixtures/ && test -z \"$(git status --porcelain fixtures/)\""
   },
   "dependencies": {
