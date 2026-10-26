@@ -178,9 +178,11 @@ model RequestCommand {
   actor     String
   action    String
   target    String // REASSIGN: the new approver; else ""
+  ordinal   Int // position within its day for the org (D-38): fixture rank by (requestId, seq); live = max+1
   createdAt DateTime     @default(now()) @db.Timestamptz(6)
 
   @@unique([orgId, requestId, seq])
+  @@unique([orgId, on, ordinal])
 }
 
 // ------------------------------------------------------------------------------------------------------- derived

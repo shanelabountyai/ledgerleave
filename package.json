@@ -33,6 +33,8 @@
     "leave:eval": "tsx scripts/leave/eval.ts",
     "ledger:verify": "tsx scripts/leave/verify.ts",
     "leave:route": "tsx scripts/leave/route.ts",
+    "leave:import": "dotenv -e .env.local -- tsx scripts/leave/import-fixtures.ts",
+    "leave:import:test": "dotenv -e .env.test -e .env.local -- tsx scripts/leave/import-fixtures.ts",
     "engine:lint": "tsx scripts/leave/engine-lint.ts",
     "fixtures:check": "python3 -I tools/verify_fixtures.py && python3 -I tools/golden_answers.py && git diff --exit-code fixtures/ && test -z \"$(git status --porcelain fixtures/)\""
   },

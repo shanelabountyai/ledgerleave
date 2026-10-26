@@ -26,7 +26,7 @@ const entry = (minutes: number, seq = 0) => ({
 /** One row in each append-only table, so the tamper loop has something to attack. */
 async function seedOneRowEach() {
   await db.ledgerEntry.create({ data: entry(50) });
-  await db.requestCommand.create({ data: { orgId, requestId: 'R-0001', seq: 1, on: '2025-05-01', actor: 'E001', action: 'SUBMIT', target: '' } });
+  await db.requestCommand.create({ data: { orgId, requestId: 'R-0001', seq: 1, on: '2025-05-01', actor: 'E001', action: 'SUBMIT', target: '', ordinal: 1 } });
   await db.requestEvent.create({
     data: { orgId, requestId: 'R-0001', seq: 1, on: '2025-05-01', actor: 'E001', action: 'SUBMIT', target: '', outcome: 'APPLIED', logLines: ['SUBMIT:E001:2025-05-01:CHAIN_FROZEN'], stateAfter: 'PENDING', stepAfter: 0, finalCodeAfter: '' },
   });
