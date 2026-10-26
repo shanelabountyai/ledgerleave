@@ -7,6 +7,8 @@ import { resetAuthTables } from '../../helpers/auth';
 
 afterAll(() => db.$disconnect());
 
+const countRows = async (t: string) => (await db.$queryRawUnsafe<{ n: number }[]>(`SELECT count(*)::int AS n FROM "${t}"`))[0]!.n;
+
 const APPEND_ONLY = ['LedgerEntry', 'RequestCommand', 'RequestEvent', 'FrozenChain', 'RequestStep'] as const;
 
 let orgId: string;
@@ -36,8 +38,7 @@ describe('append-only triggers (task 2.2)', () => {
   it('INSERT succeeds on every append-only table', async () => {
     await seedOneRowEach();
     for (const t of APPEND_ONLY) {
-      const [{ n }] = await db.$queryRawUnsafe<{ n: number }[]>(`SELECT count(*)::int AS n FROM "${t}"`);
-      expect(n, t).toBe(1);
+      expect(await countRows(t), t).toBe(1);
     }
   });
 
@@ -51,8 +52,7 @@ describe('append-only triggers (task 2.2)', () => {
   it.each(APPEND_ONLY)('%s: DELETE is refused by the trigger and the row is still there', async (t) => {
     await seedOneRowEach();
     await expect(db.$executeRawUnsafe(`DELETE FROM "${t}"`)).rejects.toThrow(new RegExp(`${t} is append-only .*DELETE refused`));
-    const [{ n }] = await db.$queryRawUnsafe<{ n: number }[]>(`SELECT count(*)::int AS n FROM "${t}"`);
-    expect(n).toBe(1);
+    expect(await countRows(t)).toBe(1);
   });
 
   it('deleting the org cannot cascade through an append-only table', async () => {
