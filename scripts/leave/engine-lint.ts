@@ -4,12 +4,13 @@
 //    database, the network, a model, or randomness, and for anything that would put a float on a minute
 //    or parse a date through the process timezone.
 // 2. Greps the whole of src/ and scripts/leave/ for the repo-wide date bans (D-7).
-// 3. (Task 1.4) Loads fixtures/policies.json through the engine's own validator so a bad vocabulary value
+// 3. Loads fixtures/policies.json through the engine's own validator so a bad vocabulary value
 //    fails here, not at the first accrual.
 //
 // Exits 1 naming every offending file:line. Zero dependencies beyond node.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { loadPolicyFile } from '../../src/accrual/policy';
 
 const ROOT = process.cwd();
 
@@ -86,22 +87,15 @@ const repoFiles = [...walk(join(ROOT, 'src')), ...walk(join(ROOT, 'scripts/leave
 
 const hits = [...lint(engineFiles, ENGINE_RULES, 'engine'), ...lint(repoFiles, DATE_RULES, 'date')];
 
-// Policy vocabularies: validated through the engine's own loader once src/accrual/policy.ts exists (task 1.4).
-let policyNote = 'policies.json: loader not built yet (task 1.4)';
+// Policy vocabularies: validated through the engine's own loader (task 1.4), so a bad value fails here, not at the
+// first accrual.
+let policyNote: string;
 try {
-  const mod = (await import('../../src/accrual/policy')) as { loadPolicyFile?: (text: string) => unknown };
-  if (mod.loadPolicyFile) {
-    const text = readFileSync(join(ROOT, 'fixtures/policies.json'), 'utf8');
-    try {
-      mod.loadPolicyFile(text);
-      policyNote = 'policies.json: every vocabulary value valid';
-    } catch (e) {
-      hits.push(`fixtures/policies.json: ${(e as Error).message}`);
-      policyNote = 'policies.json: INVALID';
-    }
-  }
-} catch {
-  // module absent: the note above stands
+  const pf = loadPolicyFile(readFileSync(join(ROOT, 'fixtures/policies.json'), 'utf8'));
+  policyNote = `policies.json: ${pf.policies.size} policies, every vocabulary value valid`;
+} catch (e) {
+  hits.push(`fixtures/policies.json: ${(e as Error).message}`);
+  policyNote = 'policies.json: INVALID';
 }
 
 console.log(`engine:lint — ${engineFiles.length} engine file(s), ${repoFiles.length} repo file(s) scanned; ${policyNote}`);
