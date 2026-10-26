@@ -35,6 +35,12 @@
     "leave:route": "tsx scripts/leave/route.ts",
     "leave:import": "dotenv -e .env.local -- tsx scripts/leave/import-fixtures.ts",
     "leave:import:test": "dotenv -e .env.test -e .env.local -- tsx scripts/leave/import-fixtures.ts",
+    "leave:replay": "dotenv -e .env.local -- tsx scripts/leave/replay.ts",
+    "leave:replay:test": "dotenv -e .env.test -e .env.local -- tsx scripts/leave/replay.ts",
+    "leave:eval:db": "dotenv -e .env.local -- tsx scripts/leave/eval-db.ts",
+    "leave:eval:db:test": "dotenv -e .env.test -e .env.local -- tsx scripts/leave/eval-db.ts",
+    "ledger:verify:db": "dotenv -e .env.local -- tsx scripts/leave/verify.ts --db",
+    "ledger:verify:db:test": "dotenv -e .env.test -e .env.local -- tsx scripts/leave/verify.ts --db",
     "engine:lint": "tsx scripts/leave/engine-lint.ts",
     "fixtures:check": "python3 -I tools/verify_fixtures.py && python3 -I tools/golden_answers.py && git diff --exit-code fixtures/ && test -z \"$(git status --porcelain fixtures/)\""
   },
