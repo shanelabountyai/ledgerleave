@@ -107,6 +107,25 @@ describe('replay into the database (tasks 2.4, 2.6, 2.7)', () => {
   });
 });
 
+describe('a row edited behind the trigger is reported (task 2.7)', () => {
+  it('a superuser disabling the trigger and changing one minute is caught by ledger:verify --db with the employee, year and column', async () => {
+    await resetAuthTables();
+    const orgId = (await importFixtures(DIR)).orgId;
+    await run(orgId, '2025-12-31');
+    // the test role is a superuser: this is the one way past the trigger, and it is exactly what the recompute is for
+    await db.$executeRawUnsafe('ALTER TABLE "LedgerEntry" DISABLE TRIGGER "LedgerEntry_append_only"');
+    try {
+      expect(await db.$executeRawUnsafe(`UPDATE "LedgerEntry" SET minutes = 51 WHERE "entryId" = 'L-000001'`)).toBe(1);
+    } finally {
+      await db.$executeRawUnsafe('ALTER TABLE "LedgerEntry" ENABLE TRIGGER "LedgerEntry_append_only"');
+    }
+    const r = verifyEntries(await ledgerEntriesFromDb(db, orgId), expectedBalances, YEARS);
+    expect(r.mismatches.map((m) => `${m.employeeId} ${m.year} ${m.leaveType} ${m.column}: expected ${m.expected}, recomputed ${m.actual}`)).toContain('E001 2024 PTO opening: expected 50, recomputed 51');
+    expect(r.mismatches.every((m) => m.employeeId === 'E001' && m.leaveType === 'PTO')).toBe(true);
+    await expect(db.$executeRawUnsafe(`UPDATE "LedgerEntry" SET minutes = 50 WHERE "entryId" = 'L-000001'`)).rejects.toThrow(/append-only/); // the trigger is back
+  }, 120_000);
+});
+
 describe('replay grows the ledger as a prefix (D-38)', () => {
   let orgId: string;
   beforeAll(async () => {
