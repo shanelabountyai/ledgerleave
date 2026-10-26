@@ -52,10 +52,10 @@ Two of my own hand-derived test expectations were wrong and were corrected again
 | `8daf06f` 1.3–1.4 | https://github.com/shanelabountyai/ledgerleave/actions/runs/40259872959 | green |
 | `e229074` 1.5–1.8 | https://github.com/shanelabountyai/ledgerleave/actions/runs/40260545550 | green |
 | `986406e` 1.9 (`leave:eval` 0 diffs in CI) | https://github.com/shanelabountyai/ledgerleave/actions/runs/40261416672 | green |
-| `713f5f5` 1.10–1.11 | https://github.com/shanelabountyai/ledgerleave/actions/runs/40261623265 | in progress when this file was written |
+| `713f5f5` 1.10–1.11 | https://github.com/shanelabountyai/ledgerleave/actions/runs/40261623265 | green |
 | `38afd24` 1.12 workflow_dispatch | https://github.com/shanelabountyai/ledgerleave/actions/runs/40261689862 | green |
 | `proof/cap-2401` (throwaway, cap 2401) | https://github.com/shanelabountyai/ledgerleave/actions/runs/40261695679 | **red on purpose**: `leave:eval` fails, every earlier step green |
-| final docs commit | see PR #1 checks | — |
+| `ddcfcaa` 1.12 EVAL.md + Phase 1 gate docs | https://github.com/shanelabountyai/ledgerleave/actions/runs/40262018890 | green (`ci` and `modules-removed`) |
 
 ### Still to do by hand (owner)
 
