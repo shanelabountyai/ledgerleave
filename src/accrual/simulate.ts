@@ -14,7 +14,7 @@ import { accrualDates, applyMaxBalanceCap, grossAccrual } from './events';
 import { type Entry, LEDGER_CODES, Ledger } from './ledger';
 import type { Policy, PolicyFile } from './policy';
 import { type Delegation, type Org, cmpStr } from '@/routing/org';
-import { type Effects, type Request, type RequestEvent, type RequestState, applyEvent, newRequestState } from '@/routing/requests';
+import { type Effects, type Request, type RequestEvent, type RequestState, applyEvent, newRequestState, overlappingOpen } from '@/routing/requests';
 
 export interface Assignment {
   readonly employeeId: string;
@@ -270,6 +270,7 @@ export class Simulation {
       workingDays: (start: string, end: string) => workingDaysOf(calendarDay(start), calendarDay(end), w.holidays) as string[],
       available: (eid: string, lt: string) => this.ledger.available(eid, lt),
       usageRowsFor: (eid: string, lt: string, rid: string) => this.ledger.usageRowsFor(eid, lt, rid),
+      overlappingOpen: (rid: string, eid: string, start: string, end: string) => overlappingOpen(this.requests, rid, eid, start, end),
     };
   }
 

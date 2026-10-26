@@ -77,12 +77,34 @@ describe('codes the fixtures never reach (brief §11)', () => {
     const noHr = new Org(H.map((e) => ({ ...e, roles: '' })), []);
     expect(r('H4', 11, { org: noHr })).toBe('MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H1[HR_ROLE_HOLDER,FALLBACK_TO_CEO]');
   });
-  it('DELEGATE_LACKS_HR_ROLE: the HR primary delegates the HR step to someone without HR → R7 fallback', () => {
-    // The oracle's fallback is the HR primary — H7, the very person who delegated. Hand derivation first said H8;
-    // leavelib says H7 and the oracle wins (D-25). Noted for the owner in NEXT.md as a candidate decision.
+  it('DELEGATE_LACKS_HR_ROLE: the HR primary delegates the HR step to someone without HR → R7′ skips the delegator (D-44)', () => {
+    // Until 2026-10-26 the oracle landed on H7 — the very person who delegated (O-11). The owner decided (D-44) that the
+    // fallback skips the delegator; leavelib changed first, then this expectation. Not a test edited to pass.
     expect(r('H4', 11, { delegations: [dlg('H7', 'H6')] })).toBe(
-      'MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H7[HR_ROLE_HOLDER,DELEGATE_LACKS_HR_ROLE,FALLBACK_TO_HR]',
+      'MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H8[HR_ROLE_HOLDER,DELEGATE_LACKS_HR_ROLE,FALLBACK_TO_HR]',
     );
+  });
+  describe('GR-16 (D-44, brief §9)', () => {
+    const dlgH7 = [dlg('H7', 'H5')];
+    it('(a) the next HR holder who is neither the requester nor the delegator', () =>
+      expect(r('H4', 11, { delegations: dlgH7 })).toBe(
+        'MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H8[HR_ROLE_HOLDER,DELEGATE_LACKS_HR_ROLE,FALLBACK_TO_HR]',
+      ));
+    it('(b) nobody else holds HR → the delegator, with FALLBACK_TO_DELEGATOR; the step still requires HR', () => {
+      const orgB = new Org(H, [{ effective: '2025-05-01', employeeId: 'H8', field: 'ROLE_REVOKED', old: 'HR', new: 'HR' }]);
+      expect(r('H4', 11, { delegations: dlgH7, org: orgB })).toBe(
+        'MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H7[HR_ROLE_HOLDER,DELEGATE_LACKS_HR_ROLE,FALLBACK_TO_DELEGATOR]',
+      );
+      expect(stepRequiresHr(['HR_ROLE_HOLDER', 'DELEGATE_LACKS_HR_ROLE', 'FALLBACK_TO_DELEGATOR'])).toBe(true);
+    });
+    it('the requester is never the fallback: H8 asks, H7 delegated away → nobody else → H7 with the code', () => {
+      // H8's MANAGER step is H7, not HR-selected, so the delegation to H5 applies. The HR step is H7 → H5 lacks HR; the
+      // only other holder is the requester → FALLBACK_TO_DELEGATOR. Step 1 went to H5, so H7 is not a duplicate (R8).
+      // Hand-derived, then confirmed against leavelib before pinning (D-25).
+      expect(r('H8', 11, { delegations: dlgH7 })).toBe(
+        'MANAGER:H5[MANAGER_OF_REQUESTER,DELEGATED]|SKIP_LEVEL:H6[MANAGER_OF_MANAGER]|HR:H7[HR_ROLE_HOLDER,DELEGATE_LACKS_HR_ROLE,FALLBACK_TO_DELEGATOR]',
+      );
+    });
   });
   it('an INACTIVE delegate counts as depth exceeded (R5, plan C-12)', () => {
     expect(r('H10', 2, { delegations: [dlg('H2', 'H9', '2025-04-01', '2025-04-10')], submit: '2025-04-07' })).toBe(

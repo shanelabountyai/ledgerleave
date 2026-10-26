@@ -17,7 +17,7 @@ import { type Delegation, HR_ROLE, type Org, delegateOf } from './org';
 export const STEP_IDS = ['MANAGER', 'SKIP_LEVEL', 'HR', 'FALLBACK'] as const;
 export type StepId = (typeof STEP_IDS)[number];
 
-/** The closed code set (R1–R9). A new code needs a decision and a golden. */
+/** The closed code set (R1–R9, R7′). A new code needs a decision and a golden. */
 export const ROUTING_CODES = [
   'MANAGER_OF_REQUESTER',
   'MANAGER_OF_MANAGER',
@@ -31,6 +31,7 @@ export const ROUTING_CODES = [
   'DELEGATE_LACKS_HR_ROLE',
   'FALLBACK_TO_HR',
   'FALLBACK_TO_CEO',
+  'FALLBACK_TO_DELEGATOR', // D-44
   'UNROUTABLE',
   'DUPLICATE_APPROVER_COLLAPSED',
   'EMPTY_CHAIN_TO_HR',
@@ -85,6 +86,22 @@ function fallback(org: Org, requester: string, d: string, codes: RoutingCode[]):
   }
   codes.push('UNROUTABLE');
   return '';
+}
+
+/**
+ * R7′ (D-44): after DELEGATE_LACKS_HR_ROLE, the first HR holder by id who is neither the requester nor the approver who
+ * delegated the step away; only if none exists, that delegator (FALLBACK_TO_DELEGATOR, neutral for stepRequiresHr — the
+ * delegator was selected as an HR holder). The delegator is never the requester (R4 ran first), so this always resolves.
+ */
+function fallbackSkippingDelegator(org: Org, requester: string, delegator: string, d: string, codes: RoutingCode[]): string {
+  for (const h of org.hrHolders(d)) {
+    if (h !== requester && h !== delegator) {
+      codes.push('FALLBACK_TO_HR');
+      return h;
+    }
+  }
+  codes.push('FALLBACK_TO_DELEGATOR');
+  return delegator;
 }
 
 /**
@@ -160,7 +177,7 @@ export function route(input: RouteInput): Step[] {
           kept = appr !== '';
         } else if (stepRequiresHr(codes) && !org.rolesOf(dlg, submit).has(HR_ROLE)) {
           codes.push('DELEGATE_LACKS_HR_ROLE');
-          appr = fallback(org, requester, submit, codes);
+          appr = fallbackSkippingDelegator(org, requester, appr, submit, codes);
           kept = appr !== '';
         } else if (dlg === requester) {
           codes.push('DELEGATED', 'DELEGATE_IS_REQUESTER_STEP_DROPPED');

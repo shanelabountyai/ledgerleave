@@ -7,7 +7,7 @@ import { calendarDay as d, payPeriodEnds } from '@/accrual/calendar';
 import { loadPolicyFile, parsePolicy, type Policy, type PolicyFile } from '@/accrual/policy';
 import { type Assignment, type OpeningBalance, Simulation, type World, employeeYearRows, timesheetKey } from '@/accrual/simulate';
 import { type Delegation, type Employee, Org, type OrgChange } from '@/routing/org';
-import { type Request, type RequestEvent } from '@/routing/requests';
+import { type Request, type RequestEvent, finalStateLabel } from '@/routing/requests';
 
 const base = loadPolicyFile(readFileSync(new URL('../../../fixtures/policies.json', import.meta.url), 'utf8'));
 const HOLIDAYS = new Set(
@@ -280,6 +280,41 @@ describe('GR-15 frozen chain and eligibility at approval (brief §9)', () => {
     expect(q2.log.slice(3)).toEqual(['VOID_APPROVE:H7:2025-05-08:APPROVER_INELIGIBLE_ROLE_REVOKED', 'REASSIGN:H8:2025-05-09:STEP_REASSIGNED->H8', 'APPROVE:H8:2025-05-12:HR']);
     expect(q2.state).toBe('APPROVED');
     expect(s.voided).toBe(2);
+  });
+});
+
+describe('GR-17 OVERLAPPING_REQUEST (D-45, brief §9)', () => {
+  const H: Employee[] = [
+    emp('H1', '2010-01-04'), emp('H2', '2012-01-09', 'H1'), emp('H3', '2015-01-05', 'H2'), emp('H4', '2018-01-08', 'H3'),
+    emp('H5', '2019-01-07', 'H3'), emp('H6', '2013-01-07', 'H1'), emp('H7', '2016-01-04', 'H6', '', 'HR'),
+    emp('H8', '2020-01-06', 'H7', '', 'HR'), emp('H9', '2014-01-06', 'H2', '2025-03-31'), emp('H10', '2021-01-04', 'H9'),
+  ];
+  const D = '2025-05-05';
+  const assigns = [...H.map((h) => asg(h.id, 'PTO', 'PTO_SALARIED', h.hireDate, h.termDate)), asg('H4', 'SICK', 'SICK_STD', '2018-01-08')];
+  const s = run(world(H, assigns, {
+    opening: H.map((h) => ({ employeeId: h.id, leaveType: 'PTO', minutes: 2400 })),
+    requests: [
+      req('P1', 'H4', 'PTO', '2025-05-19', '2025-05-20', D), req('P2', 'H4', 'SICK', '2025-05-20', '2025-05-21', '2025-05-07'),
+      req('P3', 'H4', 'PTO', '2025-05-21', '2025-05-22', '2025-05-07'), req('P4', 'H4', 'PTO', '2025-05-19', '2025-05-19', '2025-05-09'),
+      req('P5', 'H4', 'PTO', '2025-05-22', '2025-05-22', '2025-05-09'),
+    ],
+    events: [
+      ev('P1', 1, D, 'H4', 'SUBMIT'), ev('P1', 2, '2025-05-06', 'H3', 'APPROVE'), ev('P2', 1, '2025-05-07', 'H4', 'SUBMIT'),
+      ev('P3', 1, '2025-05-07', 'H4', 'SUBMIT'), ev('P1', 3, '2025-05-08', 'H4', 'CANCEL'),
+      ev('P4', 1, '2025-05-09', 'H4', 'SUBMIT'), ev('P5', 1, '2025-05-09', 'H4', 'SUBMIT'),
+    ],
+    asOf: '2025-05-09',
+  }));
+  const p = (id: string) => s.requests.get(id)!;
+  it('overlapping an APPROVED request of another leave type → system denial, chain still shown', () => {
+    expect([finalStateLabel(p('P2')), p('P2').finalCode, p('P2').chain]).toEqual(['DENIED', 'OVERLAPPING_REQUEST', 'MANAGER:H3[MANAGER_OF_REQUESTER]']);
+    expect(p('P2').log).toEqual(['SUBMIT:H4:2025-05-07:CHAIN_FROZEN', 'SYSTEM_DENY:SYSTEM:2025-05-07:OVERLAPPING_REQUEST']);
+  });
+  it('adjacent days do not overlap, and denied or cancelled requests do not block', () => {
+    expect([finalStateLabel(p('P3')), finalStateLabel(p('P4'))]).toEqual(['PENDING_1', 'PENDING_1']);
+  });
+  it('overlapping a PENDING request → system denial', () => {
+    expect([finalStateLabel(p('P5')), p('P5').finalCode]).toEqual(['DENIED', 'OVERLAPPING_REQUEST']);
   });
 });
 

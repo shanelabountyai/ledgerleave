@@ -38,6 +38,7 @@ export const FINAL_CODES = {
   APPROVED: 'APPROVED',
   DENIED_BY_APPROVER: 'DENIED_BY_APPROVER',
   INSUFFICIENT_BALANCE: 'INSUFFICIENT_BALANCE',
+  OVERLAPPING_REQUEST: 'OVERLAPPING_REQUEST', // D-45
   CANCELLED_PENDING: 'CANCELLED_PENDING',
   CANCELLED_AFTER_APPROVAL: 'CANCELLED_AFTER_APPROVAL',
   UNROUTABLE: 'UNROUTABLE',
@@ -126,6 +127,11 @@ export interface RequestContext {
   workingDays(start: string, end: string): string[];
   /** L2. */
   available(employeeId: string, leaveType: string): number;
+  /**
+   * D-45: does another request of this employee, PENDING or APPROVED right now in posting order, share a day with the
+   * inclusive range? Any leave type. Returns the first such request id (by id) or null.
+   */
+  overlappingOpen(requestId: string, employeeId: string, start: string, end: string): string | null;
   /** The USAGE rows an earlier approval of this request wrote (S4). */
   usageRowsFor(employeeId: string, leaveType: string, requestId: string): readonly UsageRow[];
 }
@@ -166,6 +172,13 @@ export function applyEvent(rs: RequestState, ev: RequestEvent, ctx: RequestConte
     rs.chain = chainString(rs.steps);
     rs.state = 'SUBMITTED';
     rs.log.push(`SUBMIT:${ev.actor}:${ev.on}:CHAIN_FROZEN`);
+    // D-45: overlap with the employee's own open request, after the chain (so it is shown) and before A8
+    if (ctx.overlappingOpen(r.id, r.employeeId, r.start, r.end) !== null) {
+      rs.state = 'DENIED';
+      rs.finalCode = FINAL_CODES.OVERLAPPING_REQUEST;
+      rs.log.push(`SYSTEM_DENY:SYSTEM:${ev.on}:${FINAL_CODES.OVERLAPPING_REQUEST}`);
+      return NONE;
+    }
     // A8: the balance check, after the chain so the denial still shows who would have approved
     if (!pol.allowNegative && ctx.available(r.employeeId, r.leaveType) - rs.minutes < 0) {
       rs.state = 'DENIED';
@@ -226,6 +239,20 @@ export function applyEvent(rs: RequestState, ev: RequestEvent, ctx: RequestConte
   rs.state = 'APPROVED';
   rs.finalCode = FINAL_CODES.APPROVED;
   return { kind: 'usage', policyId: rs.policyId, days: ctx.workingDays(r.start, r.end), postedOn: ev.on, minutesPerDay: ctx.workDayMinutes };
+}
+
+/**
+ * D-45 over a request store: the first (by id) other request of `employeeId` that is PENDING or APPROVED and whose
+ * inclusive `YYYY-MM-DD` range shares a day with [start, end]. Fixed-width day strings compare as days.
+ */
+export function overlappingOpen(requests: ReadonlyMap<string, RequestState>, requestId: string, employeeId: string, start: string, end: string): string | null {
+  const hits: string[] = [];
+  for (const o of requests.values()) {
+    if (o.req.id === requestId || o.req.employeeId !== employeeId) continue;
+    if (o.state !== 'PENDING' && o.state !== 'APPROVED') continue;
+    if (o.req.start <= end && start <= o.req.end) hits.push(o.req.id);
+  }
+  return hits.length ? hits.sort()[0]! : null;
 }
 
 /** `PENDING_k` for an open request, else the state name — the `final_state` column of expected_requests.csv. */
