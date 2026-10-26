@@ -5,6 +5,7 @@
 //
 //   npm run ledger:verify                        # fixtures/
 //   npm run ledger:verify -- --ledger <csv> --expected <csv> [--years 2024,2025]
+//   npm run ledger:verify:db -- [--org <slug>]   # Phase 2 task 2.7: the LedgerEntry rows of that org instead of ledger.csv
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -50,7 +51,11 @@ const rowKey = (employeeId: string, year: number | string, leaveType: string) =>
 
 /** Recompute from the ledger text alone and compare with the expected table. */
 export function verifyLedger(ledgerCsv: string, expectedCsv: string, years: readonly number[]): VerifyResult {
-  const entries = entriesFromLedgerCsv(ledgerCsv);
+  return verifyEntries(entriesFromLedgerCsv(ledgerCsv), expectedCsv, years);
+}
+
+/** The same recompute over entries from anywhere — the database in Phase 2 (`--db`, src/leave-db/verify-db.ts). */
+export function verifyEntries(entries: readonly Entry[], expectedCsv: string, years: readonly number[]): VerifyResult {
   const ids = [...new Set(entries.map((e) => e.employeeId))];
   const actual = employeeYearRows(entries, ids, years);
   const expected = parseCsv(expectedCsv);
@@ -99,8 +104,22 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     years = [];
     for (let y = Number(m.ledger_start.slice(0, 4)); y <= Number(m.asof.slice(0, 4)); y++) years.push(y);
   }
-  const res = verifyLedger(readFileSync(ledgerPath, 'utf8'), readFileSync(expectedPath, 'utf8'), years);
-  console.log(`ledger:verify — ${res.entries} entries → ${res.rows} employee-year rows recomputed from ${ledgerPath}`);
+  let res: VerifyResult;
+  let source: string;
+  if (args.includes('--db')) {
+    const { ledgerEntriesFromDb } = await import('../../src/leave-db/verify-db');
+    const { db } = await import('../../src/core/db');
+    const slug = flag('--org') ?? 'ledgerleave-fixture';
+    const org = await db.org.findUnique({ where: { slug } });
+    if (!org) throw new Error(`org ${slug} not found`);
+    res = verifyEntries(await ledgerEntriesFromDb(db, org.id), readFileSync(expectedPath, 'utf8'), years);
+    source = `LedgerEntry rows of org ${slug}`;
+    await db.$disconnect();
+  } else {
+    res = verifyLedger(readFileSync(ledgerPath, 'utf8'), readFileSync(expectedPath, 'utf8'), years);
+    source = ledgerPath;
+  }
+  console.log(`ledger:verify — ${res.entries} entries → ${res.rows} employee-year rows recomputed from ${source}`);
   for (const m of res.mismatches) console.log(`  ${formatMismatch(m)}`);
   if (res.mismatches.length) {
     console.log(`ledger:verify FAILED: ${res.mismatches.length} mismatch(es)`);
