@@ -5,6 +5,7 @@ on:
     branches: [main]
     tags: ['v*']
   pull_request:
+  workflow_dispatch: # task 1.12: run the gate on a throwaway branch to prove it goes red
 
 jobs:
   ci:
