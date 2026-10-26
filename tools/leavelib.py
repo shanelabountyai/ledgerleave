@@ -449,6 +449,36 @@ def _fallback_skipping_delegator(org: Org, requester: str, delegator: str, d: st
     return delegator
 
 
+def _delegators_on_chain(delegations: list[Delegation], start: str, d: str) -> list[str]:
+    """D-53: the step's approver and everyone reached from it by delegations active on d, while that person is
+    themself delegating. Stops at the first person not delegating, or at a repeat."""
+    out: list[str] = []
+    x = start
+    while x and x not in out:
+        nxt = _delegate_of(delegations, x, d)
+        if not nxt:
+            break
+        out.append(x)
+        x = nxt
+    return out
+
+
+def _fallback_skipping_delegators(org: Org, requester: str, delegators: list[str], d: str, codes: list[str]) -> str:
+    """R7'' (D-53): after DELEGATION_DEPTH_EXCEEDED, R7 with every delegator on the chain excluded at every stage
+    (HR holders by id, then the CEO); only if nobody is left, the step's own approver -- the first delegator --
+    with FALLBACK_TO_DELEGATOR. That approver is active (R3) and never the requester (R4), so this always resolves."""
+    for h in org.hr_holders(d):
+        if h != requester and h not in delegators:
+            codes.append("FALLBACK_TO_HR")
+            return h
+    ceo = org.ceo()
+    if ceo != requester and ceo not in delegators and org.is_active(ceo, d):
+        codes.append("FALLBACK_TO_CEO")
+        return ceo
+    codes.append("FALLBACK_TO_DELEGATOR")
+    return delegators[0]
+
+
 def _manager_of(org: Org, eid: str, requester: str, d: str, codes: list[str]) -> tuple[str, bool]:
     """The manager of eid as of d. The CEO's manager is the HR primary (R2). An inactive manager is skipped
     upward (R3). Returns (approver, is_fallback)."""
@@ -503,7 +533,8 @@ def route(org: Org, table: RoutingTable, policy: Policy, delegations: list[Deleg
             if dlg:
                 if _delegate_of(delegations, dlg, submit) or not org.is_active(dlg, submit):
                     codes.append("DELEGATION_DEPTH_EXCEEDED")
-                    appr = _fallback(org, requester, submit, codes)
+                    appr = _fallback_skipping_delegators(org, requester, _delegators_on_chain(delegations, appr, submit),
+                                                         submit, codes)
                     kept = bool(appr)
                 elif step_requires_hr(codes) and HR_ROLE not in org.roles_of(dlg, submit):
                     codes.append("DELEGATE_LACKS_HR_ROLE")

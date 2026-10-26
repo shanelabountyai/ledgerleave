@@ -1,7 +1,7 @@
 """Ledgerleave — kickoff answer key (test oracle, never product code).
 
 Re-derives every golden case in docs/domain-brief.md §8 (GA-01..GA-20, accrual) and §9
-(GR-01..GR-17, routing) from tools/leavelib.py and checks each against the value worked by
+(GR-01..GR-18, routing) from tools/leavelib.py and checks each against the value worked by
 hand in the brief. Prints one line per case and ends with OK, or exits 1 naming the first
 mismatch.
 
@@ -258,6 +258,16 @@ def main() -> int:
           (r("H4", 11, dlg=dlg_h7), r("H4", 11, dlg=dlg_h7, o=org_b)),
           ("MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H8[HR_ROLE_HOLDER,DELEGATE_LACKS_HR_ROLE,FALLBACK_TO_HR]",
            "MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H7[HR_ROLE_HOLDER,DELEGATE_LACKS_HR_ROLE,FALLBACK_TO_DELEGATOR]"))
+    # GR-18 (D-53): the DELEGATION_DEPTH_EXCEEDED fallback skips every delegator on the chain; the step's own
+    # approver only when nobody else (HR holder, then CEO) is left
+    check("GR-18", "depth exceeded: next HR holder who is not a delegator, else the CEO, else the delegator with a code",
+          (r("H4", 2, dlg=[("H3", "H7", "2025-05-01", "2025-05-09"), ("H7", "H8", "2025-05-01", "2025-05-09")]),
+           r("H4", 11, dlg=[("H7", "H8", "2025-05-01", "2025-05-09"), ("H8", "H5", "2025-05-01", "2025-05-09")]),
+           r("H4", 11, dlg=[("H7", "H8", "2025-05-01", "2025-05-09"), ("H8", "H1", "2025-05-01", "2025-05-09"),
+                            ("H1", "H5", "2025-05-01", "2025-05-09")])),
+          ("MANAGER:H8[MANAGER_OF_REQUESTER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_HR]",
+           "MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H1[HR_ROLE_HOLDER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_CEO]",
+           "MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H7[HR_ROLE_HOLDER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_DELEGATOR]"))
     # GR-17 (D-45): a submit overlapping the employee's own PENDING or APPROVED request is denied before A8
     assigns17 = assigns + [L.Assignment("H4", "SICK", "SICK_STD", "2018-01-08", "")]
     s = run(world(H, assigns17, opening=[(h.id, "PTO", 2400) for h in H],
