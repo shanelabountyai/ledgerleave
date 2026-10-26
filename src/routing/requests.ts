@@ -73,6 +73,11 @@ export interface RequestEvent {
   readonly actor: string;
   readonly action: Action;
   readonly target: string; // REASSIGN: the new approver
+  /**
+   * Position within its day for the live write path (D-38): when present on every event of a day it wins the
+   * within-day sort; absent (the fixture files), a day sorts by (requestId, seq) as the oracle does.
+   */
+  readonly ordinal?: number;
 }
 
 export interface RequestState {

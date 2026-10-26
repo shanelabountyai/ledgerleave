@@ -66,6 +66,22 @@ export interface SimulationResult {
   readonly recomputed: number;
 }
 
+/** What a caller that stores the engine's verdicts (src/leave-db/replay.ts) is told after each event. */
+export interface SimulationObserver {
+  /** `lines` are the log lines this event appended to `rs.log`; `rs` is already in its after-state. */
+  afterEvent(ev: RequestEvent, rs: RequestState, fx: Effects, lines: readonly string[]): void;
+}
+
+export interface RunOptions {
+  /**
+   * D-38: leave the as-of day OPEN — post its class 0 (accruals) and class 1 (events) but not its class 2 (year
+   * boundaries), which belong to the day's close. The live write path replays with this on, so a later event the
+   * same day still lands before the day's boundaries; the nightly close replays yesterday with it off. The closed
+   * run of a day is always the open run plus that day's boundaries (tests/unit/leave/live-order.test.ts).
+   */
+  readonly openAsOfDay?: boolean;
+}
+
 export class Simulation {
   readonly ledger = new Ledger();
   readonly requests = new Map<string, RequestState>();
@@ -75,7 +91,10 @@ export class Simulation {
   /** Boundaries already processed per employee|leave type, in order (A7 looks back at these). */
   private readonly processedBoundaries = new Map<string, CalendarDay[]>();
 
-  constructor(readonly world: World) {}
+  constructor(
+    readonly world: World,
+    private readonly observer?: SimulationObserver,
+  ) {}
 
   // ------------------------------------------------------------------------------------------------- helpers
 
@@ -118,7 +137,7 @@ export class Simulation {
 
   // ------------------------------------------------------------------------------------------------- the day plan
 
-  run(): SimulationResult {
+  run(opts: RunOptions = {}): SimulationResult {
     const w = this.world;
     const lo = w.ledgerStart;
     const hi = w.asOf;
@@ -170,10 +189,11 @@ export class Simulation {
       // class 0 — opening adjustments, transfers, accruals (leavelib `_k0`); the sort is stable like Python's
       const class0 = [...p.class0].sort(compareClass0);
       for (const item of class0) this.doClass0(item, d as CalendarDay);
-      // class 1 — request events by (request id, seq)
-      const events = [...p.events].sort((x, y) => cmpStr(x.requestId, y.requestId) || x.seq - y.seq);
+      // class 1 — request events by ordinal when the day's events carry one (D-38), else by (request id, seq)
+      const events = [...p.events].sort((x, y) => (x.ordinal ?? 0) - (y.ordinal ?? 0) || cmpStr(x.requestId, y.requestId) || x.seq - y.seq);
       for (const ev of events) this.doEvent(ev, ctx);
-      // class 2 — boundaries by (employee, leave type)
+      // class 2 — boundaries by (employee, leave type); the as-of day's wait for its close when it is left open
+      if (opts.openAsOfDay && d === hi) continue;
       const boundaries = [...p.boundaries].sort((x, y) => cmpStr(x.assignment.employeeId, y.assignment.employeeId) || cmpStr(x.assignment.leaveType, y.assignment.leaveType));
       for (const b of boundaries) this.doBoundary(b.assignment, b.boundary);
     }
@@ -256,8 +276,10 @@ export class Simulation {
   private doEvent(ev: RequestEvent, ctx: ReturnType<Simulation['requestContext']>): void {
     const rs = this.requests.get(ev.requestId);
     if (!rs) throw new Error(`event for unknown request ${ev.requestId}`);
+    const before = rs.log.length;
     const fx: Effects = applyEvent(rs, ev, ctx);
     this.applyEffects(rs, fx);
+    this.observer?.afterEvent(ev, rs, fx, rs.log.slice(before));
   }
 
   private applyEffects(rs: RequestState, fx: Effects): void {
