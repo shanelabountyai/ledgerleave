@@ -1,0 +1,269 @@
+// CLONE-OWNED (foundation:drift CLONE_OWNED). Ledgerleave's own tables, Phase 2 task 2.1.
+//
+// Two kinds of table live here. INPUTS mirror the ten fixture files one for one (docs/domain-brief.md §12 column
+// sets) and are what a human or an import writes. DERIVED tables are written only by the replay in
+// src/leave-db/replay.ts, which runs the pure engines over the inputs and stores what they return: ledger
+// entries, the chain frozen at submit, and one outcome-decorated event per command. Nothing here stores a
+// balance (non-negotiable 1): `balance` and `available` are sums over LedgerEntry, and tests/integration/leave/
+// schema.test.ts asserts no column of any table is named like one.
+//
+// Every calendar day is a CHAR(10) `YYYY-MM-DD` string (D-7). a Postgres `date` column is banned (D-7, engine:lint).
+// Append-only tables (LedgerEntry, RequestCommand, RequestEvent, FrozenChain, RequestStep) carry BEFORE UPDATE OR
+// DELETE triggers in the hand-written migration; TRUNCATE is left alone so tests can empty them (INV-19 shape).
+// Every table carries orgId (the foundation's tenancy); the Org back-relations are the `// app` lines in core.prisma (D-13).
+
+// ------------------------------------------------------------------------------------------------------ settings
+
+/// One row per org: where the ledger starts (D-11) and, for an org seeded from the frozen fixtures, the seed and as-of.
+model LeaveSettings {
+  orgId       String   @id @db.Uuid
+  org         Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  ledgerStart String   @db.Char(10)
+  fixtureSeed Int?
+  fixtureAsOf String?  @db.Char(10)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// The whole policies.json document (policies, routing table, pay period, work day), validated by loadPolicyFile
+/// on write and content-hashed. The replay reads the newest row for the org. Policy edits are a new row (seam only).
+model PolicySet {
+  id          String   @id @default(uuid()) @db.Uuid
+  orgId       String   @db.Uuid
+  org         Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  content     Json
+  contentHash String // sha256 hex of the canonical JSON text stored in `content`
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([orgId, contentHash])
+  @@index([orgId, createdAt])
+}
+
+// -------------------------------------------------------------------------------------------------------- inputs
+
+/// employees.csv. managerId null = the CEO; termDate null = employed. roles is the `+`-joined list as the engine reads it.
+model Employee {
+  id             String   @id @default(uuid()) @db.Uuid
+  orgId          String   @db.Uuid
+  org            Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  employeeId     String // natural key, e.g. E001
+  name           String
+  title          String
+  dept           String
+  managerId      String?
+  employmentType String // SALARIED | HOURLY
+  roles          String // "+"-joined, "" for none
+  hireDate       String   @db.Char(10)
+  termDate       String?  @db.Char(10)
+  email          String // outbox recipient; synthetic (D-36)
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([orgId, employeeId])
+}
+
+/// org_changes.csv: MANAGER | ROLE_GRANTED | ROLE_REVOKED, effective on a day.
+model OrgChange {
+  id         String   @id @default(uuid()) @db.Uuid
+  orgId      String   @db.Uuid
+  org        Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  effective  String   @db.Char(10)
+  employeeId String
+  field      String
+  oldValue   String
+  newValue   String
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([orgId, effective, employeeId, field])
+}
+
+/// assignments.csv: one policy per employee per leave type for a date range; end null = open.
+model PolicyAssignment {
+  id         String   @id @default(uuid()) @db.Uuid
+  orgId      String   @db.Uuid
+  org        Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  employeeId String
+  leaveType  String
+  policyId   String
+  start      String   @db.Char(10)
+  end        String?  @db.Char(10)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([orgId, employeeId, leaveType, start])
+}
+
+/// holidays.csv
+model Holiday {
+  id        String   @id @default(uuid()) @db.Uuid
+  orgId     String   @db.Uuid
+  org       Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  date      String   @db.Char(10)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([orgId, date])
+}
+
+/// timesheets.csv: minutes worked in the pay period ending periodEnd (PER_HOURS_WORKED accrual input).
+model Timesheet {
+  id            String   @id @default(uuid()) @db.Uuid
+  orgId         String   @db.Uuid
+  org           Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  employeeId    String
+  periodEnd     String   @db.Char(10)
+  minutesWorked Int
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([orgId, employeeId, periodEnd])
+}
+
+/// delegations.csv: approver → delegate while start ≤ day ≤ end (one hop, R5).
+model Delegation {
+  id         String   @id @default(uuid()) @db.Uuid
+  orgId      String   @db.Uuid
+  org        Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  approverId String
+  delegateId String
+  start      String   @db.Char(10)
+  end        String   @db.Char(10)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([orgId, approverId, delegateId, start])
+}
+
+/// opening_balances.csv: the ADJUSTMENT the replay posts effective the day before the ledger starts (D-11).
+model OpeningBalance {
+  id         String   @id @default(uuid()) @db.Uuid
+  orgId      String   @db.Uuid
+  org        Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  employeeId String
+  leaveType  String
+  minutes    Int
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([orgId, employeeId, leaveType])
+}
+
+/// requests.csv: the facts a requester states. Everything the engine derives from them is in FrozenChain,
+/// RequestStep and RequestEvent.
+model LeaveRequest {
+  id          String   @id @default(uuid()) @db.Uuid
+  orgId       String   @db.Uuid
+  org         Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  requestId   String // natural key, e.g. R-0001
+  employeeId  String
+  leaveType   String
+  start       String   @db.Char(10)
+  end         String   @db.Char(10)
+  submittedOn String   @db.Char(10)
+  trap        String? // fixture annotation only
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+
+  commands RequestCommand[]
+  events   RequestEvent[]
+  chain    FrozenChain?
+  steps    RequestStep[]
+
+  @@unique([orgId, requestId])
+  @@index([orgId, employeeId])
+}
+
+/// request_events.csv as INPUT: what somebody did (SUBMIT, APPROVE, DENY, CANCEL, REASSIGN) on a day. Append-only.
+/// The engine's verdict on each command is the RequestEvent row with the same (requestId, seq).
+model RequestCommand {
+  id        String       @id @default(uuid()) @db.Uuid
+  orgId     String       @db.Uuid
+  org       Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  requestId String
+  request   LeaveRequest @relation(fields: [orgId, requestId], references: [orgId, requestId], onDelete: Restrict)
+  seq       Int
+  on        String       @db.Char(10)
+  actor     String
+  action    String
+  target    String // REASSIGN: the new approver; else ""
+  createdAt DateTime     @default(now()) @db.Timestamptz(6)
+
+  @@unique([orgId, requestId, seq])
+}
+
+// ------------------------------------------------------------------------------------------------------- derived
+
+/// The chain and the numbers fixed at SUBMIT (D-20, D-22): never rewritten. One per submitted request.
+model FrozenChain {
+  id          String       @id @default(uuid()) @db.Uuid
+  orgId       String       @db.Uuid
+  org         Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  requestId   String
+  request     LeaveRequest @relation(fields: [orgId, requestId], references: [orgId, requestId], onDelete: Restrict)
+  policyId    String
+  workingDays Int
+  minutes     Int
+  chain       String // chainString(steps), e.g. MANAGER:E008[MANAGER_OF_REQUESTER]|~HR:...
+  createdAt   DateTime     @default(now()) @db.Timestamptz(6)
+
+  @@unique([orgId, requestId])
+}
+
+/// One row per step of the frozen chain, kept or dropped, with the resolved approver AS ROUTED and the ordered
+/// reason codes. A REASSIGN does not edit this row: it is a RequestEvent whose target names the new approver.
+model RequestStep {
+  id        String       @id @default(uuid()) @db.Uuid
+  orgId     String       @db.Uuid
+  org       Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  requestId String
+  request   LeaveRequest @relation(fields: [orgId, requestId], references: [orgId, requestId], onDelete: Restrict)
+  index     Int // position in the full chain, dropped steps included
+  stepId    String // MANAGER | SKIP_LEVEL | HR | FALLBACK
+  approver  String // "" when UNROUTABLE
+  codes     String[]
+  kept      Boolean
+  createdAt DateTime     @default(now()) @db.Timestamptz(6)
+
+  @@unique([orgId, requestId, index])
+  @@index([orgId, approver])
+}
+
+/// The engine's verdict on one RequestCommand (same requestId, seq): APPLIED, VOID or IGNORED, the log lines it
+/// produced, and the request's state after it. The request's current state is its last event's stateAfter.
+model RequestEvent {
+  id             String       @id @default(uuid()) @db.Uuid
+  orgId          String       @db.Uuid
+  org            Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  requestId      String
+  request        LeaveRequest @relation(fields: [orgId, requestId], references: [orgId, requestId], onDelete: Restrict)
+  seq            Int
+  on             String       @db.Char(10)
+  actor          String
+  action         String
+  target         String
+  outcome        String // APPLIED | VOID | IGNORED
+  logLines       String[] // "ACTION:actor:date:code" lines this event appended, in order
+  stateAfter     String // DRAFT | SUBMITTED | PENDING | APPROVED | DENIED | CANCELLED
+  stepAfter      Int // index into the kept steps
+  finalCodeAfter String // "" while open
+  createdAt      DateTime     @default(now()) @db.Timestamptz(6)
+
+  @@unique([orgId, requestId, seq])
+}
+
+/// L3. Append-only; seq and entryId are assigned by a trigger in posting order (a caller-supplied seq must be the
+/// next one or the insert is refused). The natural-key unique index is the replay's idempotence backstop (D-37).
+model LedgerEntry {
+  id            String   @id @default(uuid()) @db.Uuid
+  orgId         String   @db.Uuid
+  org           Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  seq           Int      @default(0) // 0 = "assign me"; the trigger writes max+1 for the org
+  entryId       String   @default("") // "L-" + 6-digit seq, trigger-written
+  employeeId    String
+  leaveType     String
+  policyId      String
+  kind          String // ENTRY_KINDS; CHECK constraint mirrors src/accrual/ledger.ts
+  effective     String   @db.Char(10)
+  posted        String   @db.Char(10)
+  minutes       Int
+  cappedMinutes Int
+  codes         String // "+"-joined
+  ref           String
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([orgId, seq])
+  @@unique([orgId, employeeId, leaveType, policyId, kind, effective, posted, minutes, codes, ref], map: "LedgerEntry_natural_key")
+  @@index([orgId, employeeId, leaveType, effective])
+}
