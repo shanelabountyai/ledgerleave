@@ -84,6 +84,7 @@ Defaults taken while the owner was away. Each is reversible; `docs/phase-1-plan.
 | O-8 | LLM anywhere | **No** in Phases 1–3; P1 experiment: policy-JSON explainer scored against the goldens | The engines are the product path |
 | O-9 | CEO's long leave: HR alone (default) or HR plus a board/second approver? | **HR alone** (GR-08) | Routing table could add a `BOARD` step as data |
 | O-10 | Transfer-in above the new policy's max balance | **Not capped**; accrual pauses until usage brings it under | Capping at transfer would forfeit earned time on a job change |
+| O-11 | `DELEGATE_LACKS_HR_ROLE` fallback may land on the delegator (found 2026-10-25 while pinning the code's unit test) | **Oracle behaviour kept**: R7 picks the HR primary ≠ requester, which is the very HR holder who delegated the step away (`HR:H7[HR_ROLE_HOLDER,DELEGATE_LACKS_HR_ROLE,FALLBACK_TO_HR]`) | R7 says "never the requester, never inactive" and nothing about the delegator; skipping them would be a new rule needing a decision and a golden. Count in the fixtures: 0 |
 
 ## Not modeled (seams only)
 
