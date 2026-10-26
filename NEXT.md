@@ -12,6 +12,7 @@ Cloud session 2026-10-26 (Claude Opus 5.5), owner decision: **O-14 gets the same
 | TypeScript | `src/routing/route.ts` (`delegatorsOnChain`, `fallbackSkippingDelegators`); 5 tests in `routing.test.ts` (GR-18 ×3, a delegation cycle, the CEO as requester) |
 | Re-proved | `leave:eval` 0 diffs (5057 / 198 / 389) · `ledger:verify` 198/0 · `engine:lint` 0 · `fixtures:check` OK · DB import → replay 6688 → replay 0 → `ledger:verify --db` 198/0 → `leave:eval --db` 0 diffs ×3, ledger hash `d2a090f80d2b…` unchanged · `npm test` **413/413** · typecheck clean |
 | Not run locally | Playwright (engine-only change; CI runs the 16 specs) |
+| CI | `5f3cb51` (PR #2): https://github.com/shanelabountyai/ledgerleave/actions/runs/40371083892 — **green** (`ci` incl. Playwright, `modules-removed`) |
 
 Nuance left as is (stated in D-53's scope, not a new open item): only delegators **on the step's chain** are skipped; an HR holder away on an unrelated delegation can still be chosen as the fallback — the existing test "a fallback approver is never delegated (R7)" pins that.
 
