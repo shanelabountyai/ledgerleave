@@ -1,8 +1,70 @@
 # NEXT
 
-## ▶ State: Phase 1 complete on branch `kickoff` (PR #1, never merged by the agent). Stopped at the Phase 1 gate; Phase 2 not started.
+## ▶ State: Phase 2 complete on branch `kickoff` (PR #1, never merged by the agent). Stopped at the Phase 2 gate; Phase 3 not started — `docs/phase-3-tasks.md` is a draft to review.
 
-Unattended cloud build session, 2026-10-25, Claude Fable 5.1. Working order and every default taken: `docs/phase-1-plan.md` (contradictions C-1..C-13, defaults §5). Decisions D-29..D-34 and open item O-11 in `docs/decisions.md`. Measured numbers: `docs/EVAL.md`. Draft of the next phase: `docs/phase-2-tasks.md` — **review before anyone starts it.**
+Unattended cloud build sessions: Phase 1 on 2026-10-25, Phase 2 on 2026-10-26 (Claude Fable 5.1). Phase 2 decisions D-35..D-41 and open items O-12, O-13 in `docs/decisions.md`; every Phase 2 number in `docs/EVAL.md` ("Phase 2 — the same answers from the database"); tasks ticked with what changed from the draft in `docs/phase-2-tasks.md`.
+
+### Phase 2 exit criteria — all met (CI run 40321952682 on `96536b9`, then the docs commits)
+
+| Criterion | Result | Command |
+|---|---|---|
+| `ledger:verify` against the database equals the oracle | 5057 LedgerEntry rows → **198 rows, 0 diffs** | `npm run ledger:verify:db` |
+| and the three reference files rebuilt from rows alone | `ledger.csv` 5057 · `expected_balances.csv` 198 · `expected_requests.csv` 389 — **0 diffs each**, trigger-assigned entry ids included | `npm run leave:eval:db` |
+| Replaying twice writes nothing the second time | first: 5057 / 389 / 429 / 813 inserted (ledger / chains / steps / events); second: **0 / 0 / 0 / 0**, 0 queued, same ledger hash | `npm run leave:replay` ×2 |
+| UPDATE/DELETE rejected by triggers | 5 tables (LedgerEntry, RequestCommand, RequestEvent, FrozenChain, RequestStep): 10 tamper tests, rows unchanged; org delete cannot cascade through; ORM refused | `tests/integration/leave/tamper.test.ts` |
+| Outbox holds the expected QUEUED rows, nothing sent | **759** (382 / 322 / 55), all `sentAt` null; count derived from the oracle's log lines; 0 captured; the cron drain is unwired (D-40) | `tests/integration/leave/replay.test.ts` |
+| Live writes through the engines | GR-15 reproduced through `submitRequest`/`approveRequest`/`reassignStep`; void approvals write 0 ledger and 0 outbox rows | `tests/integration/leave/actions.test.ts` |
+| Suite | 386 tests, 47 files, green locally under `TZ=America/Chicago` and in CI (PostgreSQL 17) | `npm test` |
+
+### What was built (tasks 2.1–2.9, ticked in `docs/phase-2-tasks.md`)
+
+- `prisma/schema/ledgerleave.prisma` + migrations `20261026000000_ledgerleave_init`, `20261026000001_request_command_ordinal`: 16 clone-owned tables, every day `CHAR(10)`, CHECK lists mirroring the TS vocabularies (tested for equality), append-only triggers, ledger seq/entryId assigned by trigger in posting order. `core.prisma` changed only by 15 `// app` back-relations (drift clean).
+- `scripts/leave/import-fixtures.ts` (`leave:import`): ten input files → tables, upsert by natural key, commands append-only with a within-day `ordinal`.
+- `src/leave-db/replay.ts` (`leave:replay`): World from tables → `Simulation` → insert the missing suffix; stored rows must be a prefix of the engine's answer or `ReplayDivergence` writes nothing (D-38). `src/leave-db/notify.ts` + `templates.ts`: outbox rows per applied event (D-23). `src/leave-db/actions.ts`: submit/approve/deny/cancel/reassign = append a command, replay the day open, one transaction (D-39). `src/leave-db/verify-db.ts` + `scripts/leave/eval-db.ts` (`leave:eval:db`, `ledger:verify:db`): the proofs from rows alone.
+- Engine: `RequestEvent.ordinal?` (within-day order for live writes), `Simulation.run({ openAsOfDay })`, a per-event observer — `leave:eval` unchanged at 0 diffs (`tests/unit/leave/live-order.test.ts`).
+- `src/app/cron-jobs.ts`: outbox drain unwired; the nightly close seam documented (2.8). `src/app/required-modules.ts`: `['notifications']`.
+- CI: after `vitest`, `import → replay → replay → verify --db → eval-db` on the runner's Postgres.
+
+### Red runs this session and what fixed them
+
+| Commit | Run | Red step | Fix |
+|---|---|---|---|
+| `f8a1935` 2.1/2.2 | https://github.com/shanelabountyai/ledgerleave/actions/runs/40319426296 | `typecheck` (both jobs): a destructured `$queryRawUnsafe` row is possibly undefined under `noUncheckedIndexedAccess`; the local incremental `tsc` had not re-checked the new file | `countRows` helper (`38c2e…` folded into the next push); the local check is now `rm tsconfig.tsbuildinfo && tsc --noEmit` |
+
+Green: `d09b02b` (2.1–2.3) run 40320500813; `96536b9` (2.4–2.9) run 40321952682. CI logs are not readable through the proxy (403 on the log blob); step names and conclusions are.
+
+### Left open for the owner
+
+- **O-12** who acts as whom (User ↔ Employee) and **O-13** the calendar-day source for "today" — both block Phase 3 task 3.0.
+- **O-6** overlap validation waited (no decision, no golden); **D-31** billing still unwired not removed; **O-11** unchanged.
+- `docs/phase-3-tasks.md` is a draft to review, not a plan to execute.
+- Two of my hand derivations were wrong again and corrected against the oracle before pinning (D-25): the H10 chain in `actions.test.ts` (the skip-level climbs to H1, it does not collapse onto H2), and the closed-day forfeiture count in `live-order.test.ts`. No expected value from the kit was edited.
+
+### Sandbox report (D-35)
+
+- `prisma generate` runs with `PRISMA_SCHEMA_ENGINE_BINARY=<any executable>` (the client generator never calls the schema engine); the sandbox's PostgreSQL 16 was online, so migrations were applied with `psql -f` in order and the FULL `npm test` ran locally (386 green). `.env.test` was written locally (gitignored).
+- Still CI-only: `prisma migrate deploy` / `migrate diff` (schema engine download is 403), Playwright. There is no `migrate diff` drift check in CI; the migration SQL was hand-written to Prisma's naming and the DB tests exercise every column — a Mac `npx prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema --shadow-database-url …` is on the to-do list.
+- Donors for the outbox (Callboard/Showcall) and ledger (LoanBook): still 403 from this session; written fresh from D-23 / D-8 (D-32 stands).
+
+### CI runs (branch `kickoff`, PR #1)
+
+| Commit | Run | Result |
+|---|---|---|
+| `f8a1935` 2.1/2.2 schema, migration, tests | https://github.com/shanelabountyai/ledgerleave/actions/runs/40319426296 | **red**: typecheck (fixed, see above) |
+| `d09b02b` 2.1–2.3 + engine ordinal/openAsOfDay | https://github.com/shanelabountyai/ledgerleave/actions/runs/40320500813 | green |
+| `96536b9` 2.4–2.9 (replay, outbox, verify/eval --db, actions, CI steps) | https://github.com/shanelabountyai/ledgerleave/actions/runs/40321952682 | green |
+| gate docs commit | see the last row the session adds below | — |
+
+### Still to do by hand (owner)
+
+- Review PR #1 (Phase 1 + Phase 2); merge when satisfied. Delete branch `proof/cap-2401` (left from Phase 1).
+- Run `npx prisma migrate diff` on the Mac (above) and `npm run test:e2e` once (Playwright never ran in the sandbox; CI runs it).
+- Decide O-12, O-13, O-6; `~/.claude/CLAUDE.md` port row (ledgerleave → 7300); build-log card #14 chips: `0 diffs vs Python oracle (5057 entries, 389 requests); replayed into Postgres: 198 rows 0 diffs, 759 notices queued, 0 sent`.
+- Re-run `~/Projects/reuse-scan.py` on the Mac (D-29).
+
+---
+
+## Phase 1 record (2026-10-25), kept as written
 
 ### Phase 1 exit criteria — all met
 

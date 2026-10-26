@@ -40,6 +40,29 @@ Printed by `npm run leave:eval` (identical to `python3 -I tools/reference_leave.
 
 Codes with count 0 in the fixtures (`DELEGATE_LACKS_HR_ROLE`, `FALLBACK_TO_CEO`, `UNROUTABLE`, `IGNORED_NOT_DRAFT`, `IGNORED_TERMINAL`, `IGNORED_NOT_PENDING`, `CANCEL_NOT_REQUESTER_OR_HR`, `REASSIGN_NOT_HR`, `APPROVER_INACTIVE`) are covered by unit tests in `tests/unit/leave/routing.test.ts` and `goldens.test.ts`, each checked against `tools/leavelib.py` before being pinned.
 
+## Phase 2 — the same answers from the database (measured 2026-10-26, branch `kickoff`)
+
+Phase 2 feeds the engines from tables instead of files and stores what they return. These numbers say the TABLES hold the oracle's answer, and that the write path is idempotent and append-only; they still say nothing about policy fitness (D-24). Each is produced by the command named, locally against PostgreSQL 16 and in CI (`.github/workflows/ci.yml`) against the runner's PostgreSQL 17, run 40321952682 (`96536b9`).
+
+| Measure | Value | Command |
+|---|---|---|
+| Inputs imported (ten files → ten tables + settings) | Employee 50 · OrgChange 11 · PolicyAssignment 101 · Holiday 16 · Timesheet 726 · Delegation 14 · OpeningBalance 86 · LeaveRequest 389 · RequestCommand 813 · PolicySet 1 | `npm run leave:import` |
+| Second import | identical sha256 of every one of the 11 tables (ids and timestamps excluded), **0** commands inserted | `tests/integration/leave/import.test.ts` |
+| First replay (engine → tables) | LedgerEntry **5057** · FrozenChain **389** · RequestStep **429** · RequestEvent **813** inserted; engine 15 void, 0 ignored, 2 recomputed; ledger hash `d2a090f80d2b…` | `npm run leave:replay` |
+| Second replay | **0 / 0 / 0 / 0** inserted, 0 outbox rows queued, same ledger hash | `npm run leave:replay` (again) |
+| `ledger:verify --db` (198 rows recomputed from LedgerEntry alone) | **198 rows, 0 diffs** | `npm run ledger:verify:db` |
+| `leave:eval --db` (three reference files rebuilt from rows alone — trigger-assigned entry ids and seqs included; requests from LeaveRequest + FrozenChain + RequestEvent) | `ledger.csv` **5057 rows, 0 diffs** · `expected_balances.csv` **198, 0** · `expected_requests.csv` **389, 0** | `npm run leave:eval:db` |
+| Outbox (D-23) | **759** rows, all `QUEUED` (`sentAt` null, 0 attempts): APPROVAL_REQUESTED 382 · APPROVED 322 (294 final + 28 later cancelled) · DENIED 55 (22 by approver + 33 by the system); 0 captured, 0 sent. 759 is counted independently from the SUBMIT/APPROVE/DENY/REASSIGN lines of `expected_requests.csv` | `tests/integration/leave/replay.test.ts` |
+| Append-only (non-negotiable 2) | UPDATE and DELETE refused by trigger on LedgerEntry, RequestCommand, RequestEvent, FrozenChain, RequestStep (10 tamper tests, row unchanged); org delete cannot cascade through them; ORM update/delete refused | `tests/integration/leave/tamper.test.ts` |
+| Ledger seq by the database | seq 0 → 1, 2, 3 per org with `L-000001`…; a caller seq that is not the next one is refused, never renumbered; natural key unique; unknown kind refused by CHECK | `tamper.test.ts` |
+| CHECK vocabularies = TypeScript lists | 7 constraints read back from `pg_constraint` equal `ENTRY_KINDS`, `ACTIONS` (×2), `STATES`, `EVENT_OUTCOMES`, `STEP_IDS`, `ORG_CHANGE_FIELDS` | `tests/integration/leave/schema.test.ts` |
+| No stored balance (non-negotiable 1) | 0 columns named like `balance`/`available` in any table; 18 day columns are `CHAR(10)`; 0 `date` columns | `schema.test.ts` |
+| Divergence refusal | a CANCEL backdated into a closed day: `ReplayDivergence`, 67 differences named from `L-004991`, **0 rows written** | `replay.test.ts` |
+| Prefix growth (D-38) | replay to 2025-06-30, then 2025-12-31 open, then closed: the close inserts only `FORFEITURE` rows effective 2025-12-31; total 5057; `leave:eval --db` 0 diffs | `replay.test.ts` |
+| Edited row behind a disabled trigger | one minute changed on `L-000001` → `E001 2024 PTO opening: expected 50, recomputed 51` (and the rows it moves), trigger re-enabled and refusing again | `replay.test.ts` |
+| Live actions (task 2.5) | GR-15 Q1/Q2 reproduced through `submitRequest`/`approveRequest`/`reassignStep` in date order, each its own transaction; 2 void approvals wrote 0 ledger rows and 0 outbox rows; cancel after approval mirrors 2 usage rows; A8 denial at submit with its chain frozen | `tests/integration/leave/actions.test.ts` (9 tests) |
+| Suite | 386 tests in 47 files green locally under `TZ=America/Chicago` (template invariants + engine + 5 Phase 2 files) | `npm test` |
+
 ## Fixture hashes (brief §12, `fixtures/MANIFEST.json`)
 
 `npm run fixtures:check` → `OK seed=20261025`. sha256:
