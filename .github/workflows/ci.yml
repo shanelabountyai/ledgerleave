@@ -52,6 +52,14 @@ jobs:
       - run: createdb ledgerleave_test
       - run: npx prisma migrate deploy
       - run: npx vitest run
+      # Phase 2 proofs on the runner's throwaway Postgres (docs/phase-2-tasks.md 2.9): import the inputs, replay through
+      # the engines, then prove what the TABLES hold — 198 rows recomputed from LedgerEntry alone and the three
+      # reference files rebuilt from rows, 0 diffs. Twice, so the second replay's "0 inserted" is on the record.
+      - run: npx tsx scripts/leave/import-fixtures.ts
+      - run: npx tsx scripts/leave/replay.ts
+      - run: npx tsx scripts/leave/replay.ts
+      - run: npx tsx scripts/leave/verify.ts --db
+      - run: npx tsx scripts/leave/eval-db.ts
       # Production build, served — the way it ships. login.spec.ts drives a real page.
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test
