@@ -21,7 +21,20 @@ model LeaveSettings {
   ledgerStart String   @db.Char(10)
   fixtureSeed Int?
   fixtureAsOf String?  @db.Char(10)
+  /// D-43: the IANA zone whose calendar day is "today" for this org; converted once, in src/leave-db/today.ts.
+  timeZone    String   @default("America/Chicago")
   createdAt   DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// D-47: an org with append-only history is archived, never deleted. One row, written once (append-only by
+/// trigger): archiving is one-way. archivedBy is a plain user id, not a foreign key, so deleting that user later
+/// never cascades into this append-only row (rental's SetNull-into-a-trigger lesson).
+model OrgArchive {
+  orgId      String   @id @db.Uuid
+  org        Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  archivedAt DateTime @default(now()) @db.Timestamptz(6)
+  archivedBy String   @db.Uuid
+  reason     String
 }
 
 /// The whole policies.json document (policies, routing table, pay period, work day), validated by loadPolicyFile
@@ -55,9 +68,14 @@ model Employee {
   hireDate       String   @db.Char(10)
   termDate       String?  @db.Char(10)
   email          String // outbox recipient; synthetic (D-36)
+  /// D-42: the signed-in user who acts as this employee. Set or cleared only by the audited HR action
+  /// (src/leave-db/people.ts); an email match only pre-fills a suggestion, it never links.
+  userId         String?  @db.Uuid
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt      DateTime @default(now()) @db.Timestamptz(6)
 
   @@unique([orgId, employeeId])
+  @@unique([orgId, userId])
 }
 
 /// org_changes.csv: MANAGER | ROLE_GRANTED | ROLE_REVOKED, effective on a day.

@@ -28,6 +28,7 @@ model User {
   sessions         Session[]
   loginTokens      LoginToken[]
   recoveryCodes    RecoveryCode[]
+  employees        Employee[] // app
 }
 
 /// Magic-link token. Only sha256 stored; single use; 15 min.
@@ -100,6 +101,7 @@ model Org {
   requestSteps   RequestStep[] // app
   requestEvents  RequestEvent[] // app
   ledgerEntries  LedgerEntry[] // app
+  archive        OrgArchive? // app
 }
 
 model Membership {
