@@ -1,7 +1,7 @@
 /**
  * Minutes — the one unit module (D-6). Time is integer minutes; a work day is 480. No float ever touches a
  * minute: every division goes through `roundDiv` with the policy's rounding rule, applied once per accrual
- * event (C5), and `engine:lint` bans Math.round/floor/ceil/trunc, parseFloat and toFixed under the engines.
+ * event (C5), and `engine:lint` bans the Math rounding family and every float formatter under the engines.
  *
  * Lineage: the shape is LoanBook's `src/ledger/money.ts` (integer cents, one module, assert at the boundary),
  * which was not readable from this session (D-32) — written fresh from C5 and D-6.
