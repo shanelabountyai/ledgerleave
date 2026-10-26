@@ -106,6 +106,34 @@ describe('codes the fixtures never reach (brief §11)', () => {
       );
     });
   });
+  describe('GR-18 (D-53, brief §9): the DELEGATION_DEPTH_EXCEEDED fallback skips every delegator on the chain', () => {
+    // Before D-53 all three parts landed on H7 with FALLBACK_TO_HR (O-14). leavelib changed first; these strings are
+    // the oracle's GR-18, which fails on all three parts against the old R7.
+    it('(a) H3 → H7 → H8: H7 is a delegator, so the next HR holder H8', () =>
+      expect(r('H4', 2, { delegations: [dlg('H3', 'H7'), dlg('H7', 'H8')] })).toBe(
+        'MANAGER:H8[MANAGER_OF_REQUESTER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_HR]',
+      ));
+    it('(b) H7 → H8 → H5 on the HR step: both HR holders are delegators → the CEO', () =>
+      expect(r('H4', 11, { delegations: [dlg('H7', 'H8'), dlg('H8', 'H5')] })).toBe(
+        'MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H1[HR_ROLE_HOLDER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_CEO]',
+      ));
+    it('(c) H7 → H8 → H1 → H5: HR holders and the CEO all delegating → the step’s own approver, FALLBACK_TO_DELEGATOR', () => {
+      expect(r('H4', 11, { delegations: [dlg('H7', 'H8'), dlg('H8', 'H1'), dlg('H1', 'H5')] })).toBe(
+        'MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H7[HR_ROLE_HOLDER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_DELEGATOR]',
+      );
+      // neutral: the HR step still requires HR; a manager step sent back to its delegator does not
+      expect(stepRequiresHr(['HR_ROLE_HOLDER', 'DELEGATION_DEPTH_EXCEEDED', 'FALLBACK_TO_DELEGATOR'])).toBe(true);
+      expect(stepRequiresHr(['MANAGER_OF_REQUESTER', 'DELEGATION_DEPTH_EXCEEDED', 'FALLBACK_TO_DELEGATOR'])).toBe(false);
+    });
+    it('a delegation cycle stops the walk (H3 → H5 → H3): delegators H3, H5; fallback H7', () =>
+      expect(r('H4', 2, { delegations: [dlg('H3', 'H5'), dlg('H5', 'H3')] })).toBe(
+        'MANAGER:H7[MANAGER_OF_REQUESTER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_HR]',
+      ));
+    it('the CEO asks with every HR holder delegating → back to the delegator, never UNROUTABLE', () =>
+      expect(r('H1', 2, { delegations: [dlg('H7', 'H8'), dlg('H8', 'H5')] })).toBe(
+        'MANAGER:H7[MANAGER_OF_REQUESTER,CEO_MANAGER_IS_HR,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_DELEGATOR]',
+      ));
+  });
   it('an INACTIVE delegate counts as depth exceeded (R5, plan C-12)', () => {
     expect(r('H10', 2, { delegations: [dlg('H2', 'H9', '2025-04-01', '2025-04-10')], submit: '2025-04-07' })).toBe(
       'MANAGER:H7[MANAGER_OF_REQUESTER,APPROVER_INACTIVE_TO_MANAGER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_HR]',
