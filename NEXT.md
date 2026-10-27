@@ -1,12 +1,22 @@
 # NEXT
 
-## ▶ Next item: the cost review (CI minutes only; no deploy), then closure is complete
+## ▶ Next item: deploy Ledgerleave as a password-gated demo (owner chose deploy, 2026-10-27), then the cost review
 
-LinkedIn drafts done 2026-10-27: Ledger posts 135 (AI) and 136 (Impact), `ledgerleave` chip added to the Ledger page; URL in `docs/CLOSEOUT.md`. Spare angles if wanted: O-11/O-14 fallback found twice (Scale), void approvals (Scale).
+Model: Opus (security gate + cloud seed guard). Subdomain proposal: `leave.labintelligence.co`.
 
-Exec brief done 2026-10-27: https://claude.ai/artifact/RR5tjkRw3WiCTGGaUX9ySw (private until shared; no screenshots, the repo has no capture spec; gate re-run: leave:eval 0 diffs, ledger:verify 198/0, fixtures:check OK, engine:lint 0 hits, npm test 411 tests / 52 files green).
+Checklist, in order:
+1. `docs/decisions.md` entry reversing "not deployed" (also fix the port-table row text in `~/.claude/CLAUDE.md` and `docs/CLOSEOUT.md` "Out of scope: deploy").
+2. Port boxloop's shared-password gate: `~/Projects/boxloop/src/proxy.ts` + `~/Projects/boxloop/src/subscriptions/demo-gate.ts` + `tests/unit/demo-gate.test.ts` (Basic auth, `DEMO_ACCESS_PASSWORD`, fails closed on Vercel with no password). Record lineage in decisions (port-before-write rule). Check `src/proxy.ts` here is clone-owned vs template-owned (`npm run foundation:drift`).
+3. Cloud seed path: `scripts/seed-demo.ts` refuses a cloud database on purpose; add an explicit, separate path (flag + env) that seeds the `walk` org and 6 demo accounts, never reachable by accident.
+4. Cron: `vercel.json` has `/api/cron` at `0 6 * * *` (nightly close). Decide keep/slow/off for the demo; boxloop removed its cron (D-024). Record restore note.
+5. Env lines for me to prepare, Shane pastes values: `DEMO_ACCESS_PASSWORD`, `DEMO_MODE=1`, `CRON_SECRET`, `AUTH_SECRET`, `APP_URL`, `DATABASE_URL` (Neon, pooled). Confirm `.env*` gitignored first.
+6. Shane does the clicks: Neon project `ledgerleave`, Vercel project `ledgerleave` (Root Directory `.`), Cloudflare A record DNS-only. Prepare the commands.
+7. Re-run `docs/DEMO.md` against the deployed URL; fix what breaks.
+8. Then: add the exec-brief link and demo link as first comment on Ledger posts 135/136; cost review; update CLOSEOUT artifacts table.
 
-`docs/DEMO.md` done 2026-10-27. Record each artifact URL in the `docs/CLOSEOUT.md` Artifacts table. Still open: review/merge PR #1, build-log card #14, O-8.
+Ledger posts 135 (AI) and 136 (Impact) are drafted and tightened with a one-line project setup; both unposted. https://claude.ai/artifact/Ai5xKScgT2sWtqXRQ1ZA8i
+
+---
 
 ### DEMO.md, 2026-10-27
 
