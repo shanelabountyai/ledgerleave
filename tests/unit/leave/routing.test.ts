@@ -106,6 +106,29 @@ describe('codes the fixtures never reach (brief §11)', () => {
       );
     });
   });
+  describe('GR-18 (D-56, brief §9): the DELEGATION_DEPTH_EXCEEDED fallback skips the delegator too', () => {
+    // Until 2026-10-27 (a) landed on H7, the HR primary who had delegated the step away (O-14). leavelib changed first.
+    const dlg18 = [dlg('H7', 'H5'), dlg('H5', 'H2')];
+    it('(a) the next HR holder who is neither the requester nor the delegator', () =>
+      expect(r('H4', 11, { delegations: dlg18 })).toBe(
+        'MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H8[HR_ROLE_HOLDER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_HR]',
+      ));
+    it('(b) nobody else holds HR → the delegator, with FALLBACK_TO_DELEGATOR', () => {
+      const orgB = new Org(H, [{ effective: '2025-05-01', employeeId: 'H8', field: 'ROLE_REVOKED', old: 'HR', new: 'HR' }]);
+      expect(r('H4', 11, { delegations: dlg18, org: orgB })).toBe(
+        'MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H7[HR_ROLE_HOLDER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_DELEGATOR]',
+      );
+    });
+    it('(c) a non-HR delegator and no HR holder at all → the CEO, not the delegator', () => {
+      const orgC = new Org(H, [
+        { effective: '2025-05-01', employeeId: 'H7', field: 'ROLE_REVOKED', old: 'HR', new: 'HR' },
+        { effective: '2025-05-01', employeeId: 'H8', field: 'ROLE_REVOKED', old: 'HR', new: 'HR' },
+      ]);
+      expect(r('H4', 2, { delegations: [dlg('H3', 'H5'), dlg('H5', 'H2')], org: orgC })).toBe(
+        'MANAGER:H1[MANAGER_OF_REQUESTER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_CEO]',
+      );
+    });
+  });
   it('an INACTIVE delegate counts as depth exceeded (R5, plan C-12)', () => {
     expect(r('H10', 2, { delegations: [dlg('H2', 'H9', '2025-04-01', '2025-04-10')], submit: '2025-04-07' })).toBe(
       'MANAGER:H7[MANAGER_OF_REQUESTER,APPROVER_INACTIVE_TO_MANAGER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_HR]',

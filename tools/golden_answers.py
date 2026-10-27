@@ -258,6 +258,15 @@ def main() -> int:
           (r("H4", 11, dlg=dlg_h7), r("H4", 11, dlg=dlg_h7, o=org_b)),
           ("MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H8[HR_ROLE_HOLDER,DELEGATE_LACKS_HR_ROLE,FALLBACK_TO_HR]",
            "MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H7[HR_ROLE_HOLDER,DELEGATE_LACKS_HR_ROLE,FALLBACK_TO_DELEGATOR]"))
+    # GR-18 (D-56): the DELEGATION_DEPTH_EXCEEDED fallback skips the delegator too; a non-HR delegator still reaches the CEO
+    dlg18 = [("H7", "H5", "2025-05-01", "2025-05-09"), ("H5", "H2", "2025-05-05", "2025-05-06")]
+    org_c = L.Org(H, [L.OrgChange("2025-05-01", "H7", "ROLE_REVOKED", "HR", "HR"), L.OrgChange("2025-05-01", "H8", "ROLE_REVOKED", "HR", "HR")])
+    check("GR-18", "HR primary's delegate also delegates: next HR holder, else the delegator; no HR at all -> CEO",
+          (r("H4", 11, dlg=dlg18), r("H4", 11, dlg=dlg18, o=org_b),
+           r("H4", 2, dlg=[("H3", "H5", "2025-05-01", "2025-05-09"), ("H5", "H2", "2025-05-05", "2025-05-06")], o=org_c)),
+          ("MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H8[HR_ROLE_HOLDER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_HR]",
+           "MANAGER:H3[MANAGER_OF_REQUESTER]|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]|HR:H7[HR_ROLE_HOLDER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_DELEGATOR]",
+           "MANAGER:H1[MANAGER_OF_REQUESTER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_CEO]"))
     # GR-17 (D-45): a submit overlapping the employee's own PENDING or APPROVED request is denied before A8
     assigns17 = assigns + [L.Assignment("H4", "SICK", "SICK_STD", "2018-01-08", "")]
     s = run(world(H, assigns17, opening=[(h.id, "PTO", 2400) for h in H],

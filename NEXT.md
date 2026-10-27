@@ -1,12 +1,12 @@
 # NEXT
 
-## ▶ Next item: O-14 fix (D-56), on Opus
+## ▶ Next item: closure deliverables, starting with `docs/DEMO.md` (Sonnet fits: docs, no new logic)
 
-/model opus
+Order (`~/.claude/CLAUDE.md` definition of done): `docs/DEMO.md` (run every command in it once; needs a local `.env.test`/`.env.local` first — none exist on this Mac) → exec brief (`exec-brief` skill) → LinkedIn posts in the Ledger → cost review (no deploy: CI minutes only). Record every artifact URL in `docs/CLOSEOUT.md`. Also still open: review/merge PR #1, build-log card #14, O-8.
 
-Extend D-44 to the `DELEGATION_DEPTH_EXCEEDED` fallback: skip the delegator, and post `FALLBACK_TO_DELEGATOR` only when no other HR holder exists. Order: `tools/leavelib.py` → regenerate (`build_fixtures.py --seed 20261025`, `reference_leave.py --write-expected`; expect 0 bytes moved, since the fixtures hit it 0 times) → golden **GR-18** in `golden_answers.py` → TS `src/routing/route.ts` → `leave:eval` 0 diffs, `fixtures:check` OK, `engine:lint` OK → `docs/domain-brief.md` (R7, GR list) → push, CI green on PR #1.
+### O-14 fixed, 2026-10-27 (D-56)
 
-After that come the closure deliverables (`docs/DEMO.md`, exec brief, LinkedIn posts, cost review). See `docs/CLOSEOUT.md` "Still open".
+One `fallback(…, delegator)` in `tools/leavelib.py` and `src/routing/route.ts` now serves both `DELEGATE_LACKS_HR_ROLE` (D-44) and `DELEGATION_DEPTH_EXCEEDED`: skip the delegator among HR holders; the delegator (`FALLBACK_TO_DELEGATOR`) only if it holds HR and nobody else does; a non-HR delegator still falls through to the CEO. Golden **GR-18** (3 parts). Regenerated: **0 bytes moved**. `golden_answers.py` OK · `leave:eval` 0 diffs (5057 / 198 / 389) · `fixtures:check` OK · `engine:lint` 0 hits · 181 engine tests green · `tsc` clean. `today.test.ts` cannot run on this Mac (no `.env.test`: missing `DATABASE_URL`, `AUTH_SECRET`, `APP_URL`); CI runs the full suite.
 
 ### Mac session 2026-10-27 (done)
 

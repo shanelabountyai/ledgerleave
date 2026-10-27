@@ -71,13 +71,23 @@ export function stepRequiresHr(codes: readonly RoutingCode[]): boolean {
   return req;
 }
 
-/** R7: HR primary, other HR holders by id, then the CEO; never the requester, never someone inactive; never delegated. */
-function fallback(org: Org, requester: string, d: string, codes: RoutingCode[]): string {
-  for (const h of org.hrHolders(d)) {
-    if (h !== requester) {
+/**
+ * R7: HR primary, other HR holders by id, then the CEO; never the requester, never someone inactive; never delegated.
+ * R7′ (D-44, D-56): after a failed delegation, also skip the approver who delegated the step away; if that leaves no HR
+ * holder and the delegator holds HR, the delegator (FALLBACK_TO_DELEGATOR, neutral for stepRequiresHr). A non-HR
+ * delegator changes nothing.
+ */
+function fallback(org: Org, requester: string, d: string, codes: RoutingCode[], delegator = ''): string {
+  const holders = org.hrHolders(d);
+  for (const h of holders) {
+    if (h !== requester && h !== delegator) {
       codes.push('FALLBACK_TO_HR');
       return h;
     }
+  }
+  if (delegator !== '' && holders.includes(delegator)) {
+    codes.push('FALLBACK_TO_DELEGATOR');
+    return delegator;
   }
   const ceo = org.ceo();
   if (ceo !== requester && org.isActive(ceo, d)) {
@@ -86,22 +96,6 @@ function fallback(org: Org, requester: string, d: string, codes: RoutingCode[]):
   }
   codes.push('UNROUTABLE');
   return '';
-}
-
-/**
- * R7′ (D-44): after DELEGATE_LACKS_HR_ROLE, the first HR holder by id who is neither the requester nor the approver who
- * delegated the step away; only if none exists, that delegator (FALLBACK_TO_DELEGATOR, neutral for stepRequiresHr — the
- * delegator was selected as an HR holder). The delegator is never the requester (R4 ran first), so this always resolves.
- */
-function fallbackSkippingDelegator(org: Org, requester: string, delegator: string, d: string, codes: RoutingCode[]): string {
-  for (const h of org.hrHolders(d)) {
-    if (h !== requester && h !== delegator) {
-      codes.push('FALLBACK_TO_HR');
-      return h;
-    }
-  }
-  codes.push('FALLBACK_TO_DELEGATOR');
-  return delegator;
 }
 
 /**
@@ -173,11 +167,11 @@ export function route(input: RouteInput): Step[] {
       if (dlg !== '') {
         if (delegateOf(delegations, dlg, submit) !== '' || !org.isActive(dlg, submit)) {
           codes.push('DELEGATION_DEPTH_EXCEEDED');
-          appr = fallback(org, requester, submit, codes);
+          appr = fallback(org, requester, submit, codes, appr);
           kept = appr !== '';
         } else if (stepRequiresHr(codes) && !org.rolesOf(dlg, submit).has(HR_ROLE)) {
           codes.push('DELEGATE_LACKS_HR_ROLE');
-          appr = fallbackSkippingDelegator(org, requester, appr, submit, codes);
+          appr = fallback(org, requester, submit, codes, appr);
           kept = appr !== '';
         } else if (dlg === requester) {
           codes.push('DELEGATED', 'DELEGATE_IS_REQUESTER_STEP_DROPPED');

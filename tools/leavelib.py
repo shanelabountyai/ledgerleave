@@ -422,31 +422,25 @@ def _delegate_of(delegations: list[Delegation], eid: str, d: str) -> str:
     return ""
 
 
-def _fallback(org: Org, requester: str, d: str, codes: list[str]) -> str:
+def _fallback(org: Org, requester: str, d: str, codes: list[str], delegator: str = "") -> str:
     """R7: HR primary, then other HR holders, then the CEO; never the requester, never someone inactive.
-    A fallback approver is taken as-is: delegation is not applied to it."""
-    for h in org.hr_holders(d):
-        if h != requester:
+    A fallback approver is taken as-is: delegation is not applied to it.
+    R7' (D-44, D-56): after a failed delegation, also skip the approver who delegated the step away; if that leaves
+    no HR holder and the delegator holds HR, the delegator (FALLBACK_TO_DELEGATOR). A non-HR delegator changes nothing."""
+    holders = org.hr_holders(d)
+    for h in holders:
+        if h != requester and h != delegator:
             codes.append("FALLBACK_TO_HR")
             return h
+    if delegator in holders:
+        codes.append("FALLBACK_TO_DELEGATOR")
+        return delegator
     ceo = org.ceo()
     if ceo != requester and org.is_active(ceo, d):
         codes.append("FALLBACK_TO_CEO")
         return ceo
     codes.append("UNROUTABLE")
     return ""
-
-
-def _fallback_skipping_delegator(org: Org, requester: str, delegator: str, d: str, codes: list[str]) -> str:
-    """R7' (D-44): after DELEGATE_LACKS_HR_ROLE, the first HR holder by id who is neither the requester nor the
-    approver who delegated the step away; only if none exists, that delegator (FALLBACK_TO_DELEGATOR). The delegator
-    was selected as an HR holder and is never the requester (R4 ran first), so this always resolves."""
-    for h in org.hr_holders(d):
-        if h != requester and h != delegator:
-            codes.append("FALLBACK_TO_HR")
-            return h
-    codes.append("FALLBACK_TO_DELEGATOR")
-    return delegator
 
 
 def _manager_of(org: Org, eid: str, requester: str, d: str, codes: list[str]) -> tuple[str, bool]:
@@ -503,11 +497,11 @@ def route(org: Org, table: RoutingTable, policy: Policy, delegations: list[Deleg
             if dlg:
                 if _delegate_of(delegations, dlg, submit) or not org.is_active(dlg, submit):
                     codes.append("DELEGATION_DEPTH_EXCEEDED")
-                    appr = _fallback(org, requester, submit, codes)
+                    appr = _fallback(org, requester, submit, codes, appr)
                     kept = bool(appr)
                 elif step_requires_hr(codes) and HR_ROLE not in org.roles_of(dlg, submit):
                     codes.append("DELEGATE_LACKS_HR_ROLE")
-                    appr = _fallback_skipping_delegator(org, requester, appr, submit, codes)
+                    appr = _fallback(org, requester, submit, codes, appr)
                     kept = bool(appr)
                 elif dlg == requester:
                     codes.append("DELEGATED")

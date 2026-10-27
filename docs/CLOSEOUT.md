@@ -6,7 +6,7 @@ The PRD names three phases and an optional experiment (O-8, an LLM policy explai
 
 | Phase | What | Proof (numbers in `docs/EVAL.md`) |
 |---|---|---|
-| 1 | Two pure engines: accrual (tiers, proration, caps, three policy-year kinds, retroactive forfeiture recompute) and routing (R1–R9 + R7′, frozen chain, void approvals); the request state machine | `leave:eval` 0 diffs on 5057 ledger entries, 198 employee-years, 389 requests; GA-01..GA-20, GR-01..GR-17; `engine:lint` 0 hits |
+| 1 | Two pure engines: accrual (tiers, proration, caps, three policy-year kinds, retroactive forfeiture recompute) and routing (R1–R9 + R7′, frozen chain, void approvals); the request state machine | `leave:eval` 0 diffs on 5057 ledger entries, 198 employee-years, 389 requests; GA-01..GA-20, GR-01..GR-18; `engine:lint` 0 hits |
 | 2 | 16 clone tables, append-only triggers, one replay path for history and live writes, outbox (never sent) | the same three files rebuilt from rows: 0 diffs; second replay inserts 0; 759 notices queued, 0 sent |
 | Decisions pass | D-42..D-47: account↔employee link, org time zone with one converter, R7′, `OVERLAPPING_REQUEST`, billing removed, archive instead of delete | expected files regenerated, 0 bytes moved; every Phase 1/2 proof re-run, 0 diffs |
 | 3 | My leave + preview, inbox, request page, HR console, ledger view, nightly close, `/orgs` | INV harness 0 findings over 10 actions; HR table = `expected_balances.csv` (198 rows); GR-15 walked in a browser; axe 0 violations in light and dark on 8 page states; 408 tests |
@@ -17,16 +17,14 @@ Half days (O-5) · projected accruals at submit (O-1) · pending requests reserv
 
 ## Open for the owner
 
-- **O-14** — the `DELEGATION_DEPTH_EXCEEDED` fallback can still land on the delegating approver (count in the fixtures: 0). Extending D-44 to it is one line per engine plus a golden.
 - The template's `/onboarding` list still shows archived orgs (template-owned page); the clone's `/orgs` hides them and the org nav points there.
 
 ## By hand
 
-Done 2026-10-27 on the Mac: `proof/cap-2401` deleted · `prisma migrate diff` reports no difference (D-54) · port row 7300 added to `~/.claude/CLAUDE.md` (D-55) · reuse scan run, no missed donor (D-53) · O-14 decided: fix it (D-56, next item).
+Done 2026-10-27 on the Mac: `proof/cap-2401` deleted · `prisma migrate diff` reports no difference (D-54) · port row 7300 added to `~/.claude/CLAUDE.md` (D-55) · reuse scan run, no missed donor (D-53) · O-14 fixed (D-56: GR-18, 0 bytes moved).
 
 Still open:
 1. Review PR #1 and merge when satisfied.
-2. O-14 fix (D-56): oracle → TS → GR-18, expect 0 bytes moved.
-3. Build-log card #14: status, and chips such as `0 diffs vs Python oracle (5057 entries, 389 requests)`, `GR-15 walked in a browser, axe light+dark`.
-4. Whether O-8 (the LLM explainer experiment) is worth a phase.
-5. Closure deliverables (`~/.claude/CLAUDE.md` definition of done): `docs/DEMO.md`, the exec brief, LinkedIn posts, the cost review (no deploy, so expect little to review: CI minutes only).
+2. Build-log card #14: status, and chips such as `0 diffs vs Python oracle (5057 entries, 389 requests)`, `GR-15 walked in a browser, axe light+dark`.
+3. Whether O-8 (the LLM explainer experiment) is worth a phase.
+4. Closure deliverables (`~/.claude/CLAUDE.md` definition of done): `docs/DEMO.md`, the exec brief, LinkedIn posts, the cost review (no deploy, so expect little to review: CI minutes only).
