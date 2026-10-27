@@ -1,6 +1,8 @@
 # NEXT
 
-## ▶ Next item: LinkedIn drafts in the Ledger (mine the Review log and O-11/O-14 first), then the cost review
+## ▶ Next item: the cost review (CI minutes only; no deploy), then closure is complete
+
+LinkedIn drafts done 2026-10-27: Ledger posts 135 (AI) and 136 (Impact), `ledgerleave` chip added to the Ledger page; URL in `docs/CLOSEOUT.md`. Spare angles if wanted: O-11/O-14 fallback found twice (Scale), void approvals (Scale).
 
 Exec brief done 2026-10-27: https://claude.ai/artifact/RR5tjkRw3WiCTGGaUX9ySw (private until shared; no screenshots, the repo has no capture spec; gate re-run: leave:eval 0 diffs, ledger:verify 198/0, fixtures:check OK, engine:lint 0 hits, npm test 411 tests / 52 files green).
 

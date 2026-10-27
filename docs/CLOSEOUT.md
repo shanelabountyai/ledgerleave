@@ -35,4 +35,4 @@ Still open:
 |---|---|
 | Demo script | `docs/DEMO.md` |
 | Exec brief | https://claude.ai/artifact/RR5tjkRw3WiCTGGaUX9ySw (private until shared) |
-| LinkedIn drafts | — |
+| LinkedIn drafts | Lab Intelligence Ledger https://claude.ai/artifact/Ai5xKScgT2sWtqXRQ1ZA8i — posts **135** (AI: both engines agreed on 5,057 entries, told me almost nothing) and **136** (Impact: cancelled December vacation), project `ledgerleave`, drafted 2026-10-27, not yet posted. Held back: gate-goes-red (theme reused), fallback-twice (Scale), void approvals (Scale) |
