@@ -9,6 +9,7 @@
 - `npm run db:setup` wrote `.env.local` (with `DEMO_MODE=1`) and `.env.test` (both gitignored, pool-capped) and migrated `ledgerleave` + `ledgerleave_test`.
 - Ran every terminal command in the script: `leave:eval` 0 diffs (5057 / 198 / 389) · `ledger:verify` 198/0 · `leave:route` S05 and S04 · `engine:lint` 0 hits · `fixtures:check` OK · `leave:import` 813 commands · `leave:replay` 6688 then 0 rows, hash `d2a090f8…` · `ledger:verify:db` 198/0 · `leave:eval:db` 0 diffs · `npm start` serves `/demo` with 6 accounts.
 - New `npm run leave:seed:walk` (`seedDemoWalk` in `scripts/leave/seed-hand-org.ts`): the e2e walk's starting state, now shared by `e2e/leave.spec.ts` and the demo. Playwright `leave.spec.ts` + `demo.spec.ts`: 8 passed, 0 failed, against a production build.
+- CI green on `eb5ef0d`: https://github.com/shanelabountyai/ledgerleave/actions/runs/40563726906 (`ci`, `modules-removed`).
 - `foundation:drift` cannot run locally: no `v1.3.0` tag in this checkout (`git fetch template --tags` would fix it); only clone-owned files changed.
 
 ## Was: closure deliverables, starting with `docs/DEMO.md`
