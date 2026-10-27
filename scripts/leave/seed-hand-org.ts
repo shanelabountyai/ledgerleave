@@ -4,11 +4,15 @@
  * policies and holidays, and (by default) GR-15's two org changes — H4's manager becomes H2 on 2025-05-07 and H7's HR
  * role is revoked on 2025-05-06. Writes inputs only; the replay derives everything else. Synthetic people.
  *
- *   npx tsx scripts/leave/seed-hand-org.ts [slug]     (needs DATABASE_URL; refuses if the slug exists)
+ *   npx tsx scripts/leave/seed-hand-org.ts [slug]          (needs DATABASE_URL; refuses if the slug exists)
+ *   npx tsx scripts/leave/seed-hand-org.ts --walk [slug]   the same, plus the demo accounts as members linked to the
+ *     GR-15 actors and Q1/Q2 submitted on 2025-05-05 — the e2e walk's starting state, for docs/DEMO.md
  */
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { db } from '../../src/core/db';
+import { submitRequest } from '../../src/leave-db/actions';
+import { seedDemo } from '../seed-demo';
 import { policyContentHash } from './import-fixtures';
 
 const DIR = new URL('../../fixtures/', import.meta.url);
@@ -52,10 +56,34 @@ export async function seedHandOrg(opts: HandOrgOptions = {}): Promise<string> {
   return orgId;
 }
 
+// demo account → hand-org employee (D-42 links, made here the way the HR action would make them)
+export const WALK_ACTORS = {
+  H4: 'member@acme.demo.test', H3: 'admin@acme.demo.test', H8: 'owner@acme.demo.test',
+  H2: 'member@globex.demo.test', H7: 'admin@globex.demo.test',
+} as const;
+export const WALK_OWNER = 'owner@globex.demo.test'; // the org owner, linked to nobody
+
+/** The GR-15 walk's starting state: Q1/Q2 SUBMITTED as history on 2025-05-05 (D-49), before the 05-06/05-07 org changes. */
+export async function seedDemoWalk(slug: string): Promise<string> {
+  await seedDemo();
+  const orgId = await seedHandOrg({ slug, name: 'Hand org (GR-15)' });
+  for (const [emp, email] of Object.entries(WALK_ACTORS)) {
+    const u = await db.user.findUniqueOrThrow({ where: { email } });
+    await db.membership.create({ data: { orgId, userId: u.id, role: 'member' } });
+    await db.employee.update({ where: { orgId_employeeId: { orgId, employeeId: emp } }, data: { userId: u.id } });
+  }
+  const owner = await db.user.findUniqueOrThrow({ where: { email: WALK_OWNER } });
+  await db.membership.create({ data: { orgId, userId: owner.id, role: 'owner' } });
+  await submitRequest({ orgId, employeeId: 'H4', leaveType: 'PTO', start: '2025-05-19', end: '2025-05-20', on: '2025-05-05' });
+  await submitRequest({ orgId, employeeId: 'H4', leaveType: 'PTO', start: '2025-06-02', end: '2025-06-16', on: '2025-05-05' });
+  return orgId;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const slug = process.argv[2] ?? 'hand';
-  seedHandOrg({ slug })
-    .then((id) => console.log(`seed-hand-org OK: org ${slug} (${id}), ${HAND_EMPLOYEES.length} employees`))
+  const walk = process.argv[2] === '--walk';
+  const slug = process.argv[walk ? 3 : 2] ?? (walk ? 'walk' : 'hand');
+  (walk ? seedDemoWalk(slug) : seedHandOrg({ slug }))
+    .then((id) => console.log(`seed-hand-org OK: org ${slug} (${id}), ${HAND_EMPLOYEES.length} employees${walk ? `, ${Object.keys(WALK_ACTORS).length + 1} demo members, R-0001/R-0002 submitted 2025-05-05` : ''}`))
     .catch((e: Error) => {
       console.error(`seed-hand-org FAILED: ${e.message}`);
       process.exitCode = 1;

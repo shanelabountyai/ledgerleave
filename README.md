@@ -21,6 +21,7 @@ The `SICK_STD` policy is a **sample**: shaped like a statutory accrual floor (fi
 | `npm run fixtures:check` | `tools/verify_fixtures.py` regenerates the fixtures with the pinned seed and compares every sha256; `tools/golden_answers.py` re-derives GA-01..GA-20 and GR-01..GR-18; the working tree under `fixtures/` must be clean |
 | `npm run leave:import` / `leave:replay` / `ledger:verify:db` / `leave:eval:db` | Phase 2: the fixtures into an org's tables, replayed through the engines, and the three reference files rebuilt from rows alone (0 diffs) |
 | `npm run leave:seed:hand [-- <slug>]` | the brief §9 hand org (H1–H10) as rows, for a local look around; link demo accounts to employees from the HR console |
+| `npm run leave:seed:walk [-- <slug>]` | the hand org plus the demo accounts linked to the GR-15 actors and R-0001/R-0002 submitted: the starting state of `docs/DEMO.md` and the e2e walk |
 
 ### Screens (Phase 3)
 

@@ -3,35 +3,15 @@
 // library (D-49), so the org changes of 05-06/05-07 land after the frozen chain; everything after that is clicked in
 // the browser on the server's real today (D-43), so log lines carry today's date and the golden's verdicts.
 import { type Browser, type Page, expect, test } from '@playwright/test';
-import { seedDemo } from '../scripts/seed-demo';
-import { seedHandOrg } from '../scripts/leave/seed-hand-org';
+import { WALK_ACTORS as ACTORS, WALK_OWNER as OWNER, seedDemoWalk } from '../scripts/leave/seed-hand-org';
 import { db } from '../src/core/db';
-import { submitRequest } from '../src/leave-db/actions';
 import { expectAccessible } from './axe';
 
 const SLUG = `leave-e2e-${process.pid}-${Date.now() % 1_000_000}`;
-// demo account → hand-org employee (D-42 links, made here the way the HR action would make them)
-const ACTORS = {
-  H4: 'member@acme.demo.test', H3: 'admin@acme.demo.test', H8: 'owner@acme.demo.test',
-  H2: 'member@globex.demo.test', H7: 'admin@globex.demo.test',
-} as const;
-const OWNER = 'owner@globex.demo.test'; // the org owner, linked to nobody
 
 test.describe.configure({ mode: 'serial' });
 
-test.beforeAll(async () => {
-  await seedDemo();
-  const orgId = await seedHandOrg({ slug: SLUG, name: 'Hand org (GR-15)' });
-  for (const [emp, email] of Object.entries(ACTORS)) {
-    const u = await db.user.findUniqueOrThrow({ where: { email } });
-    await db.membership.create({ data: { orgId, userId: u.id, role: 'member' } });
-    await db.employee.update({ where: { orgId_employeeId: { orgId, employeeId: emp } }, data: { userId: u.id } });
-  }
-  const owner = await db.user.findUniqueOrThrow({ where: { email: OWNER } });
-  await db.membership.create({ data: { orgId, userId: owner.id, role: 'owner' } });
-  await submitRequest({ orgId, employeeId: 'H4', leaveType: 'PTO', start: '2025-05-19', end: '2025-05-20', on: '2025-05-05' });
-  await submitRequest({ orgId, employeeId: 'H4', leaveType: 'PTO', start: '2025-06-02', end: '2025-06-16', on: '2025-05-05' });
-});
+test.beforeAll(() => seedDemoWalk(SLUG));
 test.afterAll(() => db.$disconnect());
 
 async function signIn(browser: Browser, email: string): Promise<Page> {

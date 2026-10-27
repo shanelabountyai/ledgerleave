@@ -1,6 +1,17 @@
 # NEXT
 
-## ▶ Next item: closure deliverables, starting with `docs/DEMO.md` (Sonnet fits: docs, no new logic)
+## ▶ Next item: exec brief (`exec-brief` skill, "Ledgerleave in Brief"), then LinkedIn drafts in the Ledger, then the cost review
+
+`docs/DEMO.md` done 2026-10-27. Record each artifact URL in the `docs/CLOSEOUT.md` Artifacts table. Still open: review/merge PR #1, build-log card #14, O-8.
+
+### DEMO.md, 2026-10-27
+
+- `npm run db:setup` wrote `.env.local` (with `DEMO_MODE=1`) and `.env.test` (both gitignored, pool-capped) and migrated `ledgerleave` + `ledgerleave_test`.
+- Ran every terminal command in the script: `leave:eval` 0 diffs (5057 / 198 / 389) · `ledger:verify` 198/0 · `leave:route` S05 and S04 · `engine:lint` 0 hits · `fixtures:check` OK · `leave:import` 813 commands · `leave:replay` 6688 then 0 rows, hash `d2a090f8…` · `ledger:verify:db` 198/0 · `leave:eval:db` 0 diffs · `npm start` serves `/demo` with 6 accounts.
+- New `npm run leave:seed:walk` (`seedDemoWalk` in `scripts/leave/seed-hand-org.ts`): the e2e walk's starting state, now shared by `e2e/leave.spec.ts` and the demo. Playwright `leave.spec.ts` + `demo.spec.ts`: 8 passed, 0 failed, against a production build.
+- `foundation:drift` cannot run locally: no `v1.3.0` tag in this checkout (`git fetch template --tags` would fix it); only clone-owned files changed.
+
+## Was: closure deliverables, starting with `docs/DEMO.md`
 
 Order (`~/.claude/CLAUDE.md` definition of done): `docs/DEMO.md` (run every command in it once; needs a local `.env.test`/`.env.local` first — none exist on this Mac) → exec brief (`exec-brief` skill) → LinkedIn posts in the Ledger → cost review (no deploy: CI minutes only). Record every artifact URL in `docs/CLOSEOUT.md`. Also still open: review/merge PR #1, build-log card #14, O-8.
 

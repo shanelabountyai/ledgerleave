@@ -27,4 +27,12 @@ Still open:
 1. Review PR #1 and merge when satisfied.
 2. Build-log card #14: status, and chips such as `0 diffs vs Python oracle (5057 entries, 389 requests)`, `GR-15 walked in a browser, axe light+dark`.
 3. Whether O-8 (the LLM explainer experiment) is worth a phase.
-4. Closure deliverables (`~/.claude/CLAUDE.md` definition of done): `docs/DEMO.md`, the exec brief, LinkedIn posts, the cost review (no deploy, so expect little to review: CI minutes only).
+4. Closure deliverables (`~/.claude/CLAUDE.md` definition of done): ~~`docs/DEMO.md`~~ (done 2026-10-27: every terminal command run on the Mac; the browser walk is `e2e/leave.spec.ts`, 8/8 with `demo.spec.ts`), the exec brief, LinkedIn posts, the cost review (no deploy, so expect little to review: CI minutes only).
+
+## Artifacts
+
+| Deliverable | Where |
+|---|---|
+| Demo script | `docs/DEMO.md` |
+| Exec brief | — |
+| LinkedIn drafts | — |
