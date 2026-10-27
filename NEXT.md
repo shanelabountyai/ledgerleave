@@ -6,7 +6,7 @@ Order (`~/.claude/CLAUDE.md` definition of done): `docs/DEMO.md` (run every comm
 
 ### O-14 fixed, 2026-10-27 (D-56)
 
-One `fallback(…, delegator)` in `tools/leavelib.py` and `src/routing/route.ts` now serves both `DELEGATE_LACKS_HR_ROLE` (D-44) and `DELEGATION_DEPTH_EXCEEDED`: skip the delegator among HR holders; the delegator (`FALLBACK_TO_DELEGATOR`) only if it holds HR and nobody else does; a non-HR delegator still falls through to the CEO. Golden **GR-18** (3 parts). Regenerated: **0 bytes moved**. `golden_answers.py` OK · `leave:eval` 0 diffs (5057 / 198 / 389) · `fixtures:check` OK · `engine:lint` 0 hits · 181 engine tests green · `tsc` clean. `today.test.ts` cannot run on this Mac (no `.env.test`: missing `DATABASE_URL`, `AUTH_SECRET`, `APP_URL`); CI runs the full suite.
+One `fallback(…, delegator)` in `tools/leavelib.py` and `src/routing/route.ts` now serves both `DELEGATE_LACKS_HR_ROLE` (D-44) and `DELEGATION_DEPTH_EXCEEDED`: skip the delegator among HR holders; the delegator (`FALLBACK_TO_DELEGATOR`) only if it holds HR and nobody else does; a non-HR delegator still falls through to the CEO. Golden **GR-18** (3 parts). Regenerated: **0 bytes moved**. `golden_answers.py` OK · `leave:eval` 0 diffs (5057 / 198 / 389) · `fixtures:check` OK · `engine:lint` 0 hits · 181 engine tests green · `tsc` clean. CI green on `36d74ed`: https://github.com/shanelabountyai/ledgerleave/actions/runs/40544855392 (`ci`, `modules-removed`). `today.test.ts` cannot run on this Mac (no `.env.test`: missing `DATABASE_URL`, `AUTH_SECRET`, `APP_URL`); CI runs the full suite.
 
 ### Mac session 2026-10-27 (done)
 
