@@ -34,5 +34,5 @@ Still open:
 | Deliverable | Where |
 |---|---|
 | Demo script | `docs/DEMO.md` |
-| Exec brief | — |
+| Exec brief | https://claude.ai/artifact/RR5tjkRw3WiCTGGaUX9ySw (private until shared) |
 | LinkedIn drafts | — |
