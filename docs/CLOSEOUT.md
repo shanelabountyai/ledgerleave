@@ -20,11 +20,13 @@ Half days (O-5) · projected accruals at submit (O-1) · pending requests reserv
 - **O-14** — the `DELEGATION_DEPTH_EXCEEDED` fallback can still land on the delegating approver (count in the fixtures: 0). Extending D-44 to it is one line per engine plus a golden.
 - The template's `/onboarding` list still shows archived orgs (template-owned page); the clone's `/orgs` hides them and the org nav points there.
 
-## By hand (cannot be done from the cloud session)
+## By hand
 
-1. Review PR #1 and merge when satisfied. Delete the throwaway branch `proof/cap-2401` (remote deletes are refused through the proxy).
-2. On the Mac: `npx prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema --shadow-database-url …` (the schema engine is unreachable here; the migrations are hand-written and exercised by every DB test).
-3. `~/.claude/CLAUDE.md` port table: ledgerleave → 7300.
-4. Re-run `~/Projects/reuse-scan.py` (D-29).
-5. Build-log card #14: status, and chips such as `0 diffs vs Python oracle (5057 entries, 389 requests)`, `GR-15 walked in a browser, axe light+dark`.
-6. Decide O-14 and whether O-8 (the LLM explainer experiment) is worth a phase.
+Done 2026-10-27 on the Mac: `proof/cap-2401` deleted · `prisma migrate diff` reports no difference (D-54) · port row 7300 added to `~/.claude/CLAUDE.md` (D-55) · reuse scan run, no missed donor (D-53) · O-14 decided: fix it (D-56, next item).
+
+Still open:
+1. Review PR #1 and merge when satisfied.
+2. O-14 fix (D-56): oracle → TS → GR-18, expect 0 bytes moved.
+3. Build-log card #14: status, and chips such as `0 diffs vs Python oracle (5057 entries, 389 requests)`, `GR-15 walked in a browser, axe light+dark`.
+4. Whether O-8 (the LLM explainer experiment) is worth a phase.
+5. Closure deliverables (`~/.claude/CLAUDE.md` definition of done): `docs/DEMO.md`, the exec brief, LinkedIn posts, the cost review (no deploy, so expect little to review: CI minutes only).

@@ -1,6 +1,25 @@
 # NEXT
 
-## ▶ State: decisions pass + Phase 3 complete on branch `kickoff` (PR #1, never merged by the agent). Stopped at the Phase 3 gate; the PRD names no Phase 4, so `docs/CLOSEOUT.md` is a draft to review.
+## ▶ Next item: O-14 fix (D-56), on Opus
+
+/model opus
+
+Extend D-44 to the `DELEGATION_DEPTH_EXCEEDED` fallback: skip the delegator, and post `FALLBACK_TO_DELEGATOR` only when no other HR holder exists. Order: `tools/leavelib.py` → regenerate (`build_fixtures.py --seed 20261025`, `reference_leave.py --write-expected`; expect 0 bytes moved, since the fixtures hit it 0 times) → golden **GR-18** in `golden_answers.py` → TS `src/routing/route.ts` → `leave:eval` 0 diffs, `fixtures:check` OK, `engine:lint` OK → `docs/domain-brief.md` (R7, GR list) → push, CI green on PR #1.
+
+After that come the closure deliverables (`docs/DEMO.md`, exec brief, LinkedIn posts, cost review). See `docs/CLOSEOUT.md` "Still open".
+
+### Mac session 2026-10-27 (done)
+
+- `proof/cap-2401` deleted from GitHub.
+- `prisma migrate diff … --exit-code` against a local shadow DB: **No difference detected**, exit 0 (D-54).
+- Port 7300 recorded in `~/.claude/CLAUDE.md` (D-55); 6300 stays the next free port.
+- Reuse scan: no missed donor (D-53).
+- Local checkout now has `node_modules` (`npm ci`; npm held back the install scripts for prisma, esbuild and unrs-resolver, and `migrate diff` ran anyway). There is no `.env.test` on this Mac yet: create it from the conventions recipe (`ledgerleave_test`, `?connection_limit=10&pool_timeout=20`) before the first local `npm test`.
+
+---
+
+## Previous state (2026-10-26), kept as written
+## ▶ Was: State: decisions pass + Phase 3 complete on branch `kickoff` (PR #1, never merged by the agent). Stopped at the Phase 3 gate; the PRD names no Phase 4, so `docs/CLOSEOUT.md` is a draft to review.
 
 Cloud session 2026-10-26 (Claude Opus 5.5). Owner decisions D-42..D-47 recorded and applied; build defaults D-48..D-52; every Phase 3 number in `docs/EVAL.md` ("Decisions pass + Phase 3"); tasks ticked with what changed in `docs/phase-3-tasks.md`.
 
