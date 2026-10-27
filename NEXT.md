@@ -1,6 +1,8 @@
 # NEXT
 
-## ▶ Next item: exec brief (`exec-brief` skill, "Ledgerleave in Brief"), then LinkedIn drafts in the Ledger, then the cost review
+## ▶ Next item: LinkedIn drafts in the Ledger (mine the Review log and O-11/O-14 first), then the cost review
+
+Exec brief done 2026-10-27: https://claude.ai/artifact/RR5tjkRw3WiCTGGaUX9ySw (private until shared; no screenshots, the repo has no capture spec; gate re-run: leave:eval 0 diffs, ledger:verify 198/0, fixtures:check OK, engine:lint 0 hits, npm test 411 tests / 52 files green).
 
 `docs/DEMO.md` done 2026-10-27. Record each artifact URL in the `docs/CLOSEOUT.md` Artifacts table. Still open: review/merge PR #1, build-log card #14, O-8.
 
