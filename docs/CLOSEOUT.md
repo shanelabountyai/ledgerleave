@@ -13,7 +13,7 @@ The PRD names three phases and an optional experiment (O-8, an LLM policy explai
 
 ## Out of scope (seams only, as the PRD and decisions say)
 
-Half days (O-5) · projected accruals at submit (O-1) · pending requests reserving balance (O-2) · delegator approval (O-3) · restoring cancelled minutes into a new year (O-4) · payout at termination (O-7) · a board step for the CEO (O-9) · blackout rules · payroll, calendar sync, email sending · policy editing in the UI (a new `PolicySet` row is the seam) · multi-location holidays · deploy (none planned; Neon/Vercel only if ever).
+Half days (O-5) · projected accruals at submit (O-1) · pending requests reserving balance (O-2) · delegator approval (O-3) · restoring cancelled minutes into a new year (O-4) · payout at termination (O-7) · a board step for the CEO (O-9) · blackout rules · payroll, calendar sync, email sending · policy editing in the UI (a new `PolicySet` row is the seam) · multi-location holidays · ~~deploy~~ (reversed 2026-10-27: password-gated demo, D-57).
 
 ## Open for the owner
 
@@ -27,7 +27,7 @@ Still open:
 1. Review PR #1 and merge when satisfied.
 2. Build-log card #14: status, and chips such as `0 diffs vs Python oracle (5057 entries, 389 requests)`, `GR-15 walked in a browser, axe light+dark`.
 3. Whether O-8 (the LLM explainer experiment) is worth a phase.
-4. Closure deliverables (`~/.claude/CLAUDE.md` definition of done): ~~`docs/DEMO.md`~~ (done 2026-10-27: every terminal command run on the Mac; the browser walk is `e2e/leave.spec.ts`, 8/8 with `demo.spec.ts`), the exec brief, LinkedIn posts, the cost review (no deploy, so expect little to review: CI minutes only).
+4. Closure deliverables (`~/.claude/CLAUDE.md` definition of done): ~~`docs/DEMO.md`~~ (done 2026-10-27: every terminal command run on the Mac; the browser walk is `e2e/leave.spec.ts`, 8/8 with `demo.spec.ts`), the exec brief, LinkedIn posts, the cost review (deployed per D-57: Vercel builds, Neon compute, no cron).
 
 ## Artifacts
 

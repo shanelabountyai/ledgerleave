@@ -94,7 +94,7 @@ Open http://localhost:7300/demo for each step; sign in as the account named, the
 
 - **"0 diffs" is agreement, not correctness.** The TypeScript and the Python oracle were written by the same author from the same brief. It proves the engines do what the brief says, not that the brief suits a real company (D-24).
 - **The sick-leave policy is a sample.** Shaped like a statutory accrual floor, not any jurisdiction's law. No HR, payroll or legal advice.
-- **Synthetic data, never deployed.** No email, calendar or payroll integration: notices queue and are never sent.
+- **Synthetic data, deployed only as a password-gated demo (D-57).** No email, calendar or payroll integration: notices queue and are never sent.
 - **Not built:** half days, pending requests reserving balance, payout at termination, policy editing in the UI, blackout dates. The fixtures do not generate half days or zero-day requests.
 - **Sign-in in the demo is a button.** `/demo` exists only with `DEMO_MODE=1`; real sign-in is the template's magic link + TOTP.
 - **The template's `/onboarding` list still shows archived orgs**; the app's own `/orgs` hides them.

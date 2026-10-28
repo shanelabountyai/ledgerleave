@@ -44,6 +44,7 @@
     "engine:lint": "tsx scripts/leave/engine-lint.ts",
     "leave:seed:hand": "dotenv -e .env.local -- tsx scripts/leave/seed-hand-org.ts",
     "leave:seed:walk": "dotenv -e .env.local -- tsx scripts/leave/seed-hand-org.ts --walk",
+    "seed:cloud": "dotenv -e .env.cloud -v ALLOW_CLOUD_DB=1 -- sh -c 'prisma migrate deploy && tsx scripts/seed-demo.ts && tsx scripts/leave/import-fixtures.ts --org ledgerleave-fixture && tsx scripts/leave/replay.ts && tsx scripts/leave/seed-hand-org.ts --walk'",
     "fixtures:check": "python3 -I tools/verify_fixtures.py && python3 -I tools/golden_answers.py && git diff --exit-code fixtures/ && test -z \"$(git status --porcelain fixtures/)\""
   },
   "dependencies": {
