@@ -94,16 +94,13 @@ test('H4: both approved with their chains; a request over approved days previews
   await expectAccessible(page, 'Ledger: Hal (IC) (H4)');
 });
 
-test('the owner archives the org: banner, writes refused, hidden from the org list', async ({ browser }) => {
+test('a shared demo owner cannot archive the org (D-58): refused, nothing archived', async ({ browser }) => {
   const page = await signIn(browser, OWNER);
   await page.goto(leave('/hr'));
   await page.getByLabel('Reason').fill('end of the e2e walk');
   await page.getByRole('button', { name: 'Archive org' }).click();
-  await expect(page.getByRole('main')).toContainText('This org is archived.'); // the form is replaced by the state
+  await expect(page.getByRole('main').getByRole('alert')).toContainText('This is a shared demo account');
   await page.goto(leave());
-  await expect(page.getByRole('note')).toContainText('This org is read-only');
+  await expect(page.getByRole('note')).toHaveCount(0); // no read-only banner
   await expectAccessible(page, 'My leave');
-  await page.goto('/orgs');
-  await expect(page.locator(`a[href="/o/${SLUG}/leave"]`)).toHaveCount(0); // earlier local runs may leave other hand orgs listed
-  await expectAccessible(page, /archived orgs? (is|are) hidden/);
 });

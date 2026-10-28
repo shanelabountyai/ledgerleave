@@ -5,6 +5,7 @@
 import { revalidatePath } from 'next/cache';
 import { notFound, redirect } from 'next/navigation';
 import { z } from 'zod';
+import { assertNotDemo } from '@/core/auth/session';
 import { orgAction, ref } from '@/core/authz/action';
 import type { OrgCtx } from '@/core/authz/guards';
 import { db } from '@/core/db';
@@ -106,6 +107,7 @@ export const setTimeZone = orgAction(null, z.object({ timeZone: z.string().trim(
 });
 
 export const archiveThisOrg = orgAction('org.delete', z.object({ reason: z.string().trim().min(1, 'Say why the org is being archived.').max(500) }), async (ctx, i) => {
+  assertNotDemo(ctx.session); // D-58: archive is permanent, and every /demo visitor shares the account — the template's rule for delete
   await archiveOrg({ orgId: ctx.orgId, userId: ctx.userId, reason: i.reason });
   revalidatePath(base(ctx));
   return { notice: 'Archived. The org is read-only from now on; its history is kept.' };

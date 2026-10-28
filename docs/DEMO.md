@@ -76,7 +76,7 @@ Open http://localhost:7300/demo for each step; sign in as the account named, the
 5. **`admin@acme.demo.test` (H3) → inbox → Approve R-0001** → `R-0001: APPROVED`.
 6. **`member@acme.demo.test` (H4) → `/o/walk/leave`.** Both approved; R-0002's HR step shows `(routed to H7, reassigned)`. Preview **SICK 2025-05-20..2025-05-20**: `would be DENIED OVERLAPPING_REQUEST`. Submit it anyway → `R-0003: DENIED (OVERLAPPING_REQUEST)`. Click **My ledger** for the running balance, row by row.
    **Say:** "The preview runs the same engine as the submit, so it can't disagree with it. The balance is summed fresh on every load."
-7. *(Optional, ends the org)* **`owner@globex.demo.test` → `/o/walk/leave/hr` → Archive org** with a reason. The org goes read-only with a banner and disappears from `/orgs`. Nothing is deleted.
+7. **`owner@globex.demo.test` → `/o/walk/leave/hr` → Archive org** with a reason → `This is a shared demo account, so that is switched off here.` (D-58). Archive is permanent, so shared demo accounts are refused; `tests/integration/leave/ui-actions.test.ts` archives as a real user (banner, writes refused, hidden from `/orgs`).
 
 ## Troubleshooting
 
