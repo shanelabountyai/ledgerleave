@@ -12,7 +12,7 @@ const digest = (s: string) => createHash('sha256').update(s).digest();
 
 export function gate(authorization: string | null, env: Partial<Record<string, string>>): Gate {
   const password = env.DEMO_ACCESS_PASSWORD;
-  // On Vercel a missing password fails closed; locally (dev, e2e) there is no gate.
+  // On Vercel a missing password fails closed; locally (dev, e2e) there is no gate. A changed password needs a new build (D-57).
   if (!password) return env.VERCEL ? 'misconfigured' : 'open';
   if (!authorization?.startsWith('Basic ')) return 'challenge';
   const decoded = Buffer.from(authorization.slice(6), 'base64').toString();
