@@ -9,10 +9,18 @@ Done 2026-10-27 (`a8ce2aa`, `4080a55`): steps 1–5 of the checklist.
 - Cron removed from `vercel.json` (restore note in D-57). `CRON_SECRET` stays unset, so `/api/cron` refuses everything (INV-11).
 - `.env.cloud` created (gitignored), empty `DATABASE_URL=`, `DIRECT_URL=`, `AUTH_SECRET=`; `APP_URL` set.
 
+Done 2026-10-28: **live at https://leave.labintelligence.co** behind the shared password.
+- Neon `ledgerleave` `patient-hill-24275078` (PostgreSQL 17, aws-us-east-2; a first PG 18 project was deleted empty). Vercel `ledgerleave` (`prj_aLXeKTKlbWlXo2b7dgRLv0xuVcZt`), 7 production vars, `CRON_SECRET` unset on purpose. Cloudflare A `leave` → 76.76.21.21 DNS only (the first save never published; re-added).
+- `seed:cloud` (Shane ran it; the classifier refuses Claude writing to the production DB): 14 migrations, 6 demo accounts, import, replay 6688 rows / 759 queued / hash `d2a090f8…` (= local), walk org. First run hit the import's 60s transaction timeout over the network; raised to 600s (`da1bbf4`).
+- Live checks: every path 401 with the Basic challenge (incl. `/demo`), wrong password 401, `/api/cron` 401, HSTS on.
+- D-58 (PR #3, merged `ab76e23`): shared demo accounts cannot archive an org (permanent; everyone shares `owner@globex`).
+- PR #1 merged `be7bdad`; production deploys `main`. Work continues on `main`.
+
 Still to do:
-6. Neon + Vercel + Cloudflare (commands below).
-7. `npm run seed:cloud`, then re-run `docs/DEMO.md` against https://leave.labintelligence.co; fix what breaks.
-8. Exec-brief and demo links as first comments on Ledger posts 135/136; exec brief's "not deployed" line; cost review with a baseline; CLOSEOUT artifacts table; D-58 recording what production found.
+1. Shane's signed-in look (no clicks): `/demo` 6 accounts; `admin@acme` inbox shows R-0001/R-0002; `owner@acme` HR page.
+2. Ledger posts 135/136: exec-brief and demo links as first comments. Exec brief: replace its "not deployed" line.
+3. Cost review: `neonctl projects get patient-hill-24275078 --org-id org-morning-smoke-06224724 --output json`, `vercel usage --group-by project`; baseline + keep/slow/off in D-59 (deploy record: what production found). CLOSEOUT artifacts table: live URL.
+4. Known flake (pre-existing): `leave.spec` and `demo.spec` in parallel workers race on `seedDemo`'s org upsert (`Org_slug_key`); passes with `--workers=1`.
 
 Commands (Neon org `org-morning-smoke-06224724`, Vercel scope `shanelabountyai-8212s-projects`):
 ```bash
