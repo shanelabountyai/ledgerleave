@@ -151,7 +151,8 @@ export async function importFixtures(dir: string, orgSlug = FIXTURE_ORG_SLUG): P
       PolicySet: await tx.policySet.count(where),
     };
     return { orgId, policySetHash: policyHash, tables, commandsInserted: fresh.length };
-  }, { timeout: 60_000 });
+    // ponytail: one round trip per upserted row; 60s expired against Neon from the laptop (D-57). Batch with createMany if 10 min ever runs out.
+  }, { timeout: 600_000 });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
