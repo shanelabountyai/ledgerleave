@@ -1,6 +1,19 @@
 # NEXT
 
-## ▶ Next item: deploy Ledgerleave as a password-gated demo (D-57), then the cost review
+## ▶ Next item: a design system for the app, applied so it is easy to read; minutes shown as days (Shane, 2026-10-28)
+
+Model: **Sonnet** (Shane's pick 2026-10-28: styling and markup, no money or permission logic).
+
+1. Read the current state first: `src/app/globals.css` (or wherever the light/dark tokens live), the leave pages under `src/app/o/[org]/leave/`, `e2e/axe.ts` (axe light + dark on every leave page). Precedents: boxloop D-022 (one global stylesheet over semantic HTML, so template-owned pages are styled without edits), gavel `docs/design-brief.md`. The exec brief's palette (teal accent, accrual/usage/forfeit colour pairs, Newsreader + Hanken Grotesk) is a ready starting point so the app and the brief read as one thing.
+2. Write `docs/design-brief.md`: type scale, spacing, colour tokens light/dark, tables (tabular numerals, right-aligned numbers), status pills (PENDING/APPROVED/DENIED/VOID/CANCELLED), ledger-kind chips, forms, the scope banner. Short; show it to Shane before applying.
+3. **Minutes → days, display only.** Every screen number in minutes becomes days = minutes / `work_day_minutes` (480, policy data), decimals for part days (e.g. `1.25 days`). Engines, ledger rows, `leave:eval`, CSVs and `docs/EVAL.md` stay integer minutes (non-negotiable 4; the oracle files are minutes). One formatter, one place; decisions entry (D-60) with the rounding (suggest 2 decimals, trailing zeros trimmed) and a unit test with an hourly employee's odd minutes. Check tests/e2e that assert on minute text.
+4. Apply page by page; `npm test`, `npm run test:e2e -- --workers=1` (axe light+dark), then push `main` → production rebuilds. Look at it live with Shane.
+
+Then: closure is otherwise complete (DEMO.md, brief v2, Ledger 135/136 drafted, cost review D-59). Post 135/136 when ready with the first comment in `docs/CLOSEOUT.md`; share the brief first.
+
+---
+
+## Deploy item (done 2026-10-28)
 
 Done 2026-10-27 (`a8ce2aa`, `4080a55`): steps 1–5 of the checklist.
 - D-57 recorded; CLOSEOUT, DEMO.md and the `~/.claude/CLAUDE.md` port row no longer say "not deployed".
@@ -16,7 +29,7 @@ Done 2026-10-28: **live at https://leave.labintelligence.co** behind the shared 
 - D-58 (PR #3, merged `ab76e23`): shared demo accounts cannot archive an org (permanent; everyone shares `owner@globex`).
 - PR #1 merged `be7bdad`; production deploys `main`. Work continues on `main`.
 
-Still to do:
+Was still to do (all done 2026-10-28 except posting):
 1. Shane's signed-in look (no clicks): `/demo` 6 accounts; `admin@acme` inbox shows R-0001/R-0002; `owner@acme` HR page.
 2. Ledger posts 135/136: exec-brief and demo links as first comments. Exec brief: replace its "not deployed" line.
 3. Cost review: `neonctl projects get patient-hill-24275078 --org-id org-morning-smoke-06224724 --output json`, `vercel usage --group-by project`; baseline + keep/slow/off in D-59 (deploy record: what production found). CLOSEOUT artifacts table: live URL.

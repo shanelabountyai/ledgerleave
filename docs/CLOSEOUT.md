@@ -35,6 +35,7 @@ Still open:
 |---|---|
 | Live demo | https://leave.labintelligence.co (shared password, `DEMO_ACCESS_PASSWORD` on Vercel; D-57, D-59) |
 | Demo script | `docs/DEMO.md` |
-| Exec brief | https://claude.ai/artifact/RR5tjkRw3WiCTGGaUX9ySw (private until shared; still says not deployed) |
+| Exec brief | https://claude.ai/artifact/RR5tjkRw3WiCTGGaUX9ySw (private until shared; v2 2026-10-28 links the live demo, 59 decisions) |
 | Cost review | D-59: Vercel $0.06, Neon 0.10 h over 2026-10-27..28; cron off; keep auto-deploy on `main` |
 | LinkedIn drafts | Lab Intelligence Ledger https://claude.ai/artifact/Ai5xKScgT2sWtqXRQ1ZA8i — posts **135** (AI: both engines agreed on 5,057 entries, told me almost nothing) and **136** (Impact: cancelled December vacation), project `ledgerleave`, drafted 2026-10-27, not yet posted. Held back: gate-goes-red (theme reused), fallback-twice (Scale), void approvals (Scale) |
+| First comment for 135 and 136 | The Ledger has no comment field; paste at posting time, after sharing the brief from its Share menu: `Live demo (password on request): https://leave.labintelligence.co · The one-page brief: https://claude.ai/artifact/RR5tjkRw3WiCTGGaUX9ySw` |
