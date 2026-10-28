@@ -1,15 +1,9 @@
 # NEXT
 
-## ▶ Next item: a design system for the app, applied so it is easy to read; minutes shown as days (Shane, 2026-10-28)
+## ▶ Next: look at production with Shane (design system + days shipped 2026-10-28, `d427b8f`)
 
-Model: **Sonnet** (Shane's pick 2026-10-28: styling and markup, no money or permission logic).
-
-1. Read the current state first: `src/app/globals.css` (or wherever the light/dark tokens live), the leave pages under `src/app/o/[org]/leave/`, `e2e/axe.ts` (axe light + dark on every leave page). Precedents: boxloop D-022 (one global stylesheet over semantic HTML, so template-owned pages are styled without edits), gavel `docs/design-brief.md`. The exec brief's palette (teal accent, accrual/usage/forfeit colour pairs, Newsreader + Hanken Grotesk) is a ready starting point so the app and the brief read as one thing.
-2. Write `docs/design-brief.md`: type scale, spacing, colour tokens light/dark, tables (tabular numerals, right-aligned numbers), status pills (PENDING/APPROVED/DENIED/VOID/CANCELLED), ledger-kind chips, forms, the scope banner. Short; show it to Shane before applying.
-3. **Minutes → days, display only.** Every screen number in minutes becomes days = minutes / `work_day_minutes` (480, policy data), decimals for part days (e.g. `1.25 days`). Engines, ledger rows, `leave:eval`, CSVs and `docs/EVAL.md` stay integer minutes (non-negotiable 4; the oracle files are minutes). One formatter, one place; decisions entry (D-60) with the rounding (suggest 2 decimals, trailing zeros trimmed) and a unit test with an hourly employee's odd minutes. Check tests/e2e that assert on minute text.
-4. Apply page by page; `npm test`, `npm run test:e2e -- --workers=1` (axe light+dark), then push `main` → production rebuilds. Look at it live with Shane.
-
-Then: closure is otherwise complete (DEMO.md, brief v2, Ledger 135/136 drafted, cost review D-59). Post 135/136 when ready with the first comment in `docs/CLOSEOUT.md`; share the brief first.
+Done: `docs/design-brief.md`, D-60, `formatDays` (`_ui/days.ts`), one stylesheet, fonts via `next/font/google`. `npm test` 429 passed; e2e `--workers=1` 16 passed (axe light+dark). Pushed to `main` → Vercel rebuilds.
+Open: eyeball leave.labintelligence.co (fonts load? pills/chips read OK in dark?). One unexplained run: first `npm test` had 4 failed in 2 files after 1002s, not reproduced on re-run (429/429); suspected DB contention, unconfirmed. Then post Ledger 135/136 (first comments in `docs/CLOSEOUT.md`); share the brief first.
 
 ---
 
