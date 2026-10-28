@@ -1,18 +1,37 @@
 # NEXT
 
-## ▶ Next item: deploy Ledgerleave as a password-gated demo (owner chose deploy, 2026-10-27), then the cost review
+## ▶ Next item: deploy Ledgerleave as a password-gated demo (D-57), then the cost review
 
-Model: Opus (security gate + cloud seed guard). Subdomain proposal: `leave.labintelligence.co`.
+Done 2026-10-27 (`a8ce2aa`, `4080a55`): steps 1–5 of the checklist.
+- D-57 recorded; CLOSEOUT, DEMO.md and the `~/.claude/CLAUDE.md` port row no longer say "not deployed".
+- Gate: `src/proxy.ts` + `src/app/demo-gate.ts` + `tests/unit/demo-gate.test.ts` (ported from boxloop via gavel); `FOUNDATION_PATCHES.md` row `0012a96281ad`; drift clean; `npm test` 414 passed / 53 files.
+- `npm run seed:cloud`: the only script that reads `.env.cloud` and sets `ALLOW_CLOUD_DB=1`. Runs migrate deploy, seed-demo, leave:import, leave:replay, leave:seed:walk.
+- Cron removed from `vercel.json` (restore note in D-57). `CRON_SECRET` stays unset, so `/api/cron` refuses everything (INV-11).
+- `.env.cloud` created (gitignored), empty `DATABASE_URL=`, `DIRECT_URL=`, `AUTH_SECRET=`; `APP_URL` set.
 
-Checklist, in order:
-1. `docs/decisions.md` entry reversing "not deployed" (also fix the port-table row text in `~/.claude/CLAUDE.md` and `docs/CLOSEOUT.md` "Out of scope: deploy").
-2. Port boxloop's shared-password gate: `~/Projects/boxloop/src/proxy.ts` + `~/Projects/boxloop/src/subscriptions/demo-gate.ts` + `tests/unit/demo-gate.test.ts` (Basic auth, `DEMO_ACCESS_PASSWORD`, fails closed on Vercel with no password). Record lineage in decisions (port-before-write rule). Check `src/proxy.ts` here is clone-owned vs template-owned (`npm run foundation:drift`).
-3. Cloud seed path: `scripts/seed-demo.ts` refuses a cloud database on purpose; add an explicit, separate path (flag + env) that seeds the `walk` org and 6 demo accounts, never reachable by accident.
-4. Cron: `vercel.json` has `/api/cron` at `0 6 * * *` (nightly close). Decide keep/slow/off for the demo; boxloop removed its cron (D-024). Record restore note.
-5. Env lines for me to prepare, Shane pastes values: `DEMO_ACCESS_PASSWORD`, `DEMO_MODE=1`, `CRON_SECRET`, `AUTH_SECRET`, `APP_URL`, `DATABASE_URL` (Neon, pooled). Confirm `.env*` gitignored first.
-6. Shane does the clicks: Neon project `ledgerleave`, Vercel project `ledgerleave` (Root Directory `.`), Cloudflare A record DNS-only. Prepare the commands.
-7. Re-run `docs/DEMO.md` against the deployed URL; fix what breaks.
-8. Then: add the exec-brief link and demo link as first comment on Ledger posts 135/136; cost review; update CLOSEOUT artifacts table.
+Still to do:
+6. Neon + Vercel + Cloudflare (commands below).
+7. `npm run seed:cloud`, then re-run `docs/DEMO.md` against https://leave.labintelligence.co; fix what breaks.
+8. Exec-brief and demo links as first comments on Ledger posts 135/136; exec brief's "not deployed" line; cost review with a baseline; CLOSEOUT artifacts table; D-58 recording what production found.
+
+Commands (Neon org `org-morning-smoke-06224724`, Vercel scope `shanelabountyai-8212s-projects`):
+```bash
+neonctl projects create --name ledgerleave --region-id aws-us-east-2 --org-id org-morning-smoke-06224724
+neonctl connection-string --project-id <id> --pooled   # -> DATABASE_URL (.env.cloud and Vercel)
+neonctl connection-string --project-id <id>            # -> DIRECT_URL  (.env.cloud and Vercel)
+vercel link --yes --project ledgerleave --scope shanelabountyai-8212s-projects   # creates the project; Root Directory stays "."
+vercel git connect https://github.com/shanelabountyai/ledgerleave
+printf 1 | vercel env add DEMO_MODE production
+printf 0 | vercel env add EMAIL_ENABLED production     # INV-13: no Resend in the demo; sign-in is /demo only
+printf https://leave.labintelligence.co | vercel env add APP_URL production
+vercel env add DEMO_ACCESS_PASSWORD production         # secret: Shane pastes
+vercel env add AUTH_SECRET production                  # secret: same value as .env.cloud
+vercel env add DATABASE_URL production                 # secret: pooled
+vercel env add DIRECT_URL production                   # secret: direct
+vercel domains add leave.labintelligence.co ledgerleave
+# Cloudflare: A record  leave -> 76.76.21.21, DNS only (grey cloud)
+```
+Production branch: the repo deploys `main`; branch `kickoff` (PR #1) is not merged. Either merge PR #1 or set the production branch to `kickoff` in Vercel.
 
 Ledger posts 135 (AI) and 136 (Impact) are drafted and tightened with a one-line project setup; both unposted. https://claude.ai/artifact/Ai5xKScgT2sWtqXRQ1ZA8i
 
