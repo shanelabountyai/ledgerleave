@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ActionForm } from '@/core/ui/action-form';
 import type { RequestView } from '@/leave-db/read';
-import { Chain, Minutes } from './chain';
+import { Chain, Days } from './chain';
 
 type Bound = (form: FormData) => Promise<unknown>;
 
@@ -15,7 +15,7 @@ export function RequestCard({ r, actions, href, level = 3 }: { r: RequestView; a
       </H>
       <p>
         <span className={`ll-state ll-${r.state.startsWith('PENDING') ? 'pending' : r.state.toLowerCase()}`}>{r.state}</span>
-        {r.finalCode && r.finalCode !== r.state && <> <code>{r.finalCode}</code></>} · {r.workingDays} working day{r.workingDays === 1 ? '' : 's'} · <Minutes value={-r.minutes} /> · submitted {r.submittedOn}
+        {r.finalCode && r.finalCode !== r.state && <> <code>{r.finalCode}</code></>} · {r.workingDays} working day{r.workingDays === 1 ? '' : 's'} · <Days value={-r.minutes} /> · submitted {r.submittedOn}
       </p>
       <Chain steps={r.steps} />
       <details>

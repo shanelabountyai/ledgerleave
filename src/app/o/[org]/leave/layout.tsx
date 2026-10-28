@@ -1,3 +1,4 @@
+import { Hanken_Grotesk, Newsreader } from 'next/font/google';
 import Link from 'next/link';
 import { requireOrg } from '@/core/authz/guards';
 import { db } from '@/core/db';
@@ -7,6 +8,9 @@ import { todayFor } from '@/leave-db/today';
 import { ScopeBanner } from './_ui/banner';
 import './leave.css';
 
+const body = Hanken_Grotesk({ subsets: ['latin'], variable: '--ll-font-body', display: 'swap' });
+const serif = Newsreader({ subsets: ['latin'], variable: '--ll-font-head', display: 'swap' });
+
 // Navigation only (each page guards itself too: a layout does not re-run on client navigation). The archived
 // banner and the scope banner sit above every leave page.
 export default async function LeaveLayout({ children, params }: { children: React.ReactNode; params: Promise<{ org: string }> }) {
@@ -15,7 +19,7 @@ export default async function LeaveLayout({ children, params }: { children: Reac
   const [today, me, archived, settings] = await Promise.all([todayFor(ctx.orgId), employeeForUser(ctx.orgId, ctx.userId), isArchived(ctx.orgId), db.leaveSettings.findUnique({ where: { orgId: ctx.orgId } })]);
   const hr = await hrAccess(ctx.orgId, ctx.userId, ctx.role, today);
   return (
-    <>
+    <div className={`${body.variable} ${serif.variable} ll-root`}>
       <header>
       <nav className="ll-nav" aria-label="Leave">
         <Link href={base}>My leave</Link>
@@ -30,6 +34,6 @@ export default async function LeaveLayout({ children, params }: { children: Reac
       </header>
       {children}
       <ScopeBanner />
-    </>
+    </div>
   );
 }

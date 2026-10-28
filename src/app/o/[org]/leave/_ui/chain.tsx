@@ -1,3 +1,4 @@
+import { formatDays } from './days';
 import type { StepView } from '@/leave-db/read';
 
 /** The frozen chain, step by step: `STEP:approver[codes]`, dropped steps struck through, the current one marked. */
@@ -21,15 +22,12 @@ export function Chain({ steps }: { steps: readonly StepView[] }) {
   );
 }
 
-/** Minutes are the number; days are a reading aid next to it (480 minutes a work day, D-6). */
-export function Minutes({ value }: { value: number }) {
-  const sign = value < 0 ? '−' : '';
-  const m = Math.abs(value);
-  const days = (m - (m % 480)) / 480;
-  const rest = m % 480;
+/** Days are what a reader sees (D-60); `exact` adds the integer minutes underneath where a reader reconciles against the ledger. */
+export function Days({ value, exact }: { value: number; exact?: boolean }) {
   return (
     <span className="ll-num">
-      {sign}{m} min <span className="ll-muted">({sign}{days} d{rest ? ` ${rest} min` : ''})</span>
+      {formatDays(value)}
+      {exact && <span className="ll-muted ll-exact"> {value} min</span>}
     </span>
   );
 }

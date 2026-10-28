@@ -11,6 +11,7 @@ import { employeeYearTable, requestViews } from '@/leave-db/read';
 import { todayFor } from '@/leave-db/today';
 import { archiveThisOrg, cancelLeave, linkEmployeeToUser, reassignLeave, setTimeZone, unlinkEmployee } from '../actions';
 import { SICK_POLICY_LABEL } from '../_ui/banner';
+import { Days } from '../_ui/chain';
 import { RequestCard } from '../_ui/requests';
 
 export const metadata = { title: 'HR console' };
@@ -105,14 +106,14 @@ export default async function Hr({ params }: { params: Promise<{ org: string }> 
       ))}
 
       <h2 id="balances">Employee-year table (from {table.length} rows of LedgerEntry sums)</h2>
-      <p className="ll-muted">Minutes. Opening = everything effective before the year; used is net of reversals; balance is L1 at 12-31. The same function <code>ledger:verify --db</code> diffs against the oracle.</p>
+      <p className="ll-muted">Days (exact minutes underneath). Opening = everything effective before the year; used is net of reversals; balance is L1 at 12-31. The same function <code>ledger:verify --db</code> diffs against the oracle.</p>
       <div className="ll-scroll">
         <table>
           <thead><tr><th scope="col">Employee</th><th scope="col">Year</th><th scope="col">Type</th><th scope="col" className="ll-n">Opening</th><th scope="col" className="ll-n">Accrued</th><th scope="col" className="ll-n">Capped</th><th scope="col" className="ll-n">Used</th><th scope="col" className="ll-n">Forfeited</th><th scope="col" className="ll-n">Balance end</th></tr></thead>
           <tbody>
             {table.map((r) => (
               <tr key={`${r.employeeId}-${r.year}-${r.leaveType}`}>
-                <th scope="row">{r.employeeId}</th><td>{r.year}</td><td>{r.leaveType}</td><td className="ll-n">{r.opening}</td><td className="ll-n">{r.accrued}</td><td className="ll-n">{r.capped}</td><td className="ll-n">{r.used}</td><td className="ll-n">{r.forfeited}</td><td className="ll-n">{r.balanceEnd}</td>
+                <th scope="row">{r.employeeId}</th><td>{r.year}</td><td>{r.leaveType}</td><td className="ll-n"><Days value={r.opening} exact /></td><td className="ll-n"><Days value={r.accrued} exact /></td><td className="ll-n"><Days value={r.capped} exact /></td><td className="ll-n"><Days value={r.used} exact /></td><td className="ll-n"><Days value={r.forfeited} exact /></td><td className="ll-n"><Days value={r.balanceEnd} exact /></td>
               </tr>
             ))}
           </tbody>
@@ -133,7 +134,7 @@ export default async function Hr({ params }: { params: Promise<{ org: string }> 
       <ul>
         {policies.map((p) => (
           <li key={p.id}>
-            <strong>{p.id}</strong> ({p.leave_type}, {p.accrual.frequency}, carryover cap {p.carryover_cap_minutes} min, max {p.max_balance_minutes} min, negative {p.allow_negative ? 'allowed' : 'not allowed'})
+            <strong>{p.id}</strong> ({p.leave_type}, {p.accrual.frequency}, carryover cap <Days value={p.carryover_cap_minutes} />, max <Days value={p.max_balance_minutes} />, negative {p.allow_negative ? 'allowed' : 'not allowed'})
             {p.leave_type === 'SICK' && <> — sample policy: {SICK_POLICY_LABEL}</>}
           </li>
         ))}

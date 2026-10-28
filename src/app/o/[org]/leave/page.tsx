@@ -6,7 +6,7 @@ import { NO_EMPLOYEE_MESSAGE, employeeForUser } from '@/leave-db/people';
 import { todayFor } from '@/leave-db/today';
 import { calendarDay } from '@/accrual/calendar';
 import { cancelLeave, submitLeave } from './actions';
-import { Minutes } from './_ui/chain';
+import { Days } from './_ui/chain';
 import { RequestCard } from './_ui/requests';
 
 export const metadata = { title: 'My leave' };
@@ -56,7 +56,7 @@ export default async function MyLeave({ params, searchParams }: { params: Promis
           </thead>
           <tbody>
             {balances.map((b) => (
-              <tr key={b.leaveType}><th scope="row">{b.leaveType}</th><td className="ll-n"><Minutes value={b.balance} /></td><td className="ll-n"><Minutes value={b.available} /></td></tr>
+              <tr key={b.leaveType}><th scope="row">{b.leaveType}</th><td className="ll-n"><Days value={b.balance} /></td><td className="ll-n"><Days value={b.available} /></td></tr>
             ))}
           </tbody>
         </table>
@@ -75,9 +75,9 @@ export default async function MyLeave({ params, searchParams }: { params: Promis
       {preview && (
         <section aria-label="Preview" className="ll-card">
           <h3>What submitting would do today ({preview.on})</h3>
-          <p>{preview.leaveType} {preview.start}..{preview.end} under {preview.policyId}: <strong>{preview.workingDays.length}</strong> working day{preview.workingDays.length === 1 ? '' : 's'} = <Minutes value={preview.minutes} /> ({preview.workingDays.join(', ') || 'none'})</p>
+          <p>{preview.leaveType} {preview.start}..{preview.end} under {preview.policyId}: <strong>{preview.workingDays.length}</strong> working day{preview.workingDays.length === 1 ? '' : 's'} = <Days value={preview.minutes} /> ({preview.workingDays.join(', ') || 'none'})</p>
           <p>Chain it would freeze: <code>{preview.chain}</code></p>
-          <p>Available now: <Minutes value={preview.available} />{preview.allowNegative ? ' (this policy allows a negative balance)' : ''}</p>
+          <p>Available now: <Days value={preview.available} />{preview.allowNegative ? ' (this policy allows a negative balance)' : ''}</p>
           <p>
             Verdict: <strong>{preview.verdict === 'PENDING' ? 'would go to step 1 for approval' : `would be DENIED ${preview.verdict}`}</strong>
             {preview.overlapsWith && <> — overlaps your open request <strong>{preview.overlapsWith}</strong> (D-45)</>}

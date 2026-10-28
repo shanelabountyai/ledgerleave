@@ -157,3 +157,6 @@ Kit written and run in the cloud workspace before handoff. Findings from running
 | `adjusted` column in the employee-year table was always 0 (opening balances are dated 2023-12-31) | Column removed; `opening` carries it |
 
 **Not taken:** projecting accruals in the balance check (O-1); delegator approval (O-3); restoring cancelled minutes into the new year (O-4); a `BOARD` step for the CEO (O-9).
+
+## D-60 — Screens show days; the ledger stays minutes (2026-10-28)
+Display only. `formatDays` (`src/app/o/[org]/leave/_ui/days.ts`) = minutes / `work_day_minutes` (480, D-6), 2 decimals half-up in integer arithmetic, trailing zeros trimmed, "day" only at exactly 1 (`1.25 days`, `0.5 days`, `−1 day`; a negative that rounds to 0 shows no sign). Ledger and HR tables show exact minutes as a muted second line; elsewhere days only. Engines, ledger rows, `leave:eval`, CSVs, `docs/EVAL.md` unchanged (non-negotiable 4). Test: `tests/unit/leave/format-days.test.ts` incl. a 450-minute day. Design: `docs/design-brief.md` (fonts via `next/font/google`, self-hosted at build).
