@@ -28,6 +28,7 @@ model User {
   sessions         Session[]
   loginTokens      LoginToken[]
   recoveryCodes    RecoveryCode[]
+  employees        Employee[] // app
 }
 
 /// Magic-link token. Only sha256 stored; single use; 15 min.
@@ -84,8 +85,23 @@ model Org {
   shareLinks     ShareLink[]
   projects       Project[]
   // module back-relations: each line ends in its module marker (spec §4)
-  billingAccount BillingAccount? // billing
   outbox         Outbox[] // notifications
+  leaveSettings  LeaveSettings? // app
+  policySets     PolicySet[] // app
+  employees      Employee[] // app
+  orgChanges     OrgChange[] // app
+  policyAssignments PolicyAssignment[] // app
+  holidays       Holiday[] // app
+  timesheets     Timesheet[] // app
+  delegations    Delegation[] // app
+  openingBalances OpeningBalance[] // app
+  leaveRequests  LeaveRequest[] // app
+  requestCommands RequestCommand[] // app
+  frozenChains   FrozenChain[] // app
+  requestSteps   RequestStep[] // app
+  requestEvents  RequestEvent[] // app
+  ledgerEntries  LedgerEntry[] // app
+  archive        OrgArchive? // app
 }
 
 model Membership {

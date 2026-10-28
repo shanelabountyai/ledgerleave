@@ -1,0 +1,240 @@
+# Ledgerleave — Domain Brief (accrual + routing review)
+
+The source for vocabulary, the synthetic company, the policies as data, the calendar/accrual/ledger/routing/state rules, the golden cases and the kickoff measurements. Time is integer minutes; a work day is 480. Every rule in §3–§7 is implemented in `tools/leavelib.py`; every golden in §8–§9 is printed by `tools/golden_answers.py` and ends with `OK`; every number in §11 is printed by `tools/reference_leave.py` on the frozen fixtures in §12. Items marked **[sample]** are rules this project made up for a synthetic company, not statements about any law or any real HR system.
+
+## 1. Product scope
+
+A synthetic 50-person company (CEO, 4 VPs, 5 managers, 40 individual contributors; 15 hourly, 35 salaried; two HR role holders), three leave policies, a ledger from 2024-01-01 to an as-of date of 2025-12-31, 389 leave requests with 813 events, 14 out-of-office delegations, 11 dated org changes (a manager leaves and reports are moved; one mid-flight manager change; one HR role revoke), one hourly → salaried transfer, three terminations, seven hires inside the window.
+
+Left out: half days, overlap rules, payroll and payout, statutory compliance, calendar sync, email, policy versioning.
+
+## 2. Vocabulary
+
+| Term | Meaning here |
+|---|---|
+| Leave type | `PTO` or `SICK`. A balance exists per employee per leave type. |
+| Policy | JSON data (§3) saying how a leave type accrues, when its year ends, what is capped, whether it may go negative, how routing thresholds apply. |
+| Assignment | An employee is on one policy per leave type for a date range; abutting ranges of the same type are a **transfer**. |
+| Ledger entry | One signed row of minutes with an `effective` date (which day it counts on), a `posted` date (when it was written), a kind, ordered codes and a ref. |
+| Balance | Σ entries `effective ≤ asOf` (L1), whenever posted. Always derived. |
+| Available | Σ every posted entry (L2) — the balance net of approved future usage. What the submit check uses. |
+| Accrual event | A dated grant the policy generates: monthly, per pay period, per hours worked, or on an anniversary. |
+| Year boundary | The last day of a policy year: Dec 31 (`CALENDAR`), the day before `starts` (`POLICY_YEAR`), or the clamped hire anniversary (`ANNIVERSARY`). Carryover is measured there. |
+| Forfeiture | The ledger row that removes the part of a balance above the carryover cap at a boundary. |
+| Chain | The ordered list of approval steps a request needs, computed at submit from the routing table and the org state, frozen afterwards. |
+| Step | `MANAGER`, `SKIP_LEVEL`, `HR` or `FALLBACK`, with a resolved approver and ordered reason codes; a step can be **dropped** (kept in the output, marked `~`). |
+| Delegation | "While approver A is out between two dates, delegate B acts for A." One hop only. |
+| HR primary | The lowest employee id holding the `HR` role on the date in question. |
+| Void event | An approve/deny by someone not eligible at that moment; logged, not applied. |
+| Pay period | 14 days from the anchor 2024-01-01 (a Monday); the period's **end date** is the accrual date. |
+
+## 3. Policies as data
+
+`fixtures/policies.json` (hash in §12). Closed vocabularies (D-15): `frequency ∈ {MONTHLY, PER_PAY_PERIOD, ANNIVERSARY, PER_HOURS_WORKED}`, `proration ∈ {DAILY, NONE}` (DAILY only with MONTHLY), `rounding ∈ {HALF_UP, FLOOR}`, `year.type ∈ {CALENDAR, POLICY_YEAR, ANNIVERSARY}`.
+
+| Field | PTO_SALARIED | PTO_HOURLY | SICK_STD **[sample]** |
+|---|---|---|---|
+| leave_type | PTO | PTO | SICK |
+| frequency | MONTHLY (last day of month) | PER_HOURS_WORKED | PER_PAY_PERIOD (biweekly) |
+| rate | tiers: 600/period at 0 months, 720 at 24, 840 at 60 | 2 minutes per 60 worked (= worked ÷ 30) | 120/period |
+| proration | DAILY (active days ÷ days in month) | NONE | NONE (full amount if active on the period end) |
+| rounding | HALF_UP | FLOOR | HALF_UP (never needed) |
+| year | CALENDAR (Dec 31) | ANNIVERSARY (clamped hire anniversary) | POLICY_YEAR starting 07-01 (boundary Jun 30) |
+| carryover_cap_minutes | 2400 (5 days) | 2400 | 2400 |
+| max_balance_minutes | 12000 (25 days) | 4800 | 2880 |
+| allow_negative | false | false | true |
+| routing.skip_level_over_days | 5 | 5 | null (no step) |
+| routing.hr_over_days | 10 | 10 | 3 |
+
+The sick policy is shaped like a statutory accrual floor — a fixed accrual per pay period, a carryover cap and a max balance — because that is the shape such rules often take; it is **not** any jurisdiction's rule and the project gives no HR or legal advice (D-26). `ANNIVERSARY` frequency and an exact-.5 HALF_UP are pinned by hand policies in GA-20 and GA-04.
+
+Routing table (also in `policies.json`): steps `[MANAGER, SKIP_LEVEL, HR]`, `delegation_max_depth: 1`, `fallback_order: [HR_PRIMARY, OTHER_HR, CEO]`. Holidays (`holidays.csv`): 8 per year for 2024 and 2025; none for 2026 (D-27).
+
+## 4. Synthetic company and traps
+
+Generated by `tools/build_fixtures.py --seed 20261025`. Org: E001 CEO; E002–E005 VPs (Engineering, Operations, Sales, People); E006 HR Manager (`HR`) and E007 HR Generalist (`HR`) under People; managers E008, E009 (Eng), E020, E021 (Ops), E036 (Sales), E045 (Finance); hourly staff E022–E035 and E048 under Ops. Hire dates 2015–2024 drawn, except the scripted ones below. Opening balances for pre-2024 hires are drawn (PTO 0–2400 salaried, 0–4000 hourly; sick 0–2880) and E003 is set to 11600. Timesheets for hourly assignments draw from {4800, 5280, 4790, 4785, 4500, 4200, 3600} minutes per period.
+
+**Scripted hires and org events (accrual traps):**
+
+| Trap | Who / what | What the naive answer gets wrong | Oracle's answer (ledger.csv) |
+|---|---|---|---|
+| T1 hire mid-period | E031 hired 2024-03-20 (hourly); sick period ends 03-24 | prorates sick | full 120 on 2024-03-24 (`NONE` proration) |
+| T2 tier crossing mid-year | E012 hired 2022-08-20; E009 hired 2019-03-10 | uses the Jan 1 tier all year | E012: Jul 600, Aug 720; E009: Feb 720, Mar 840 |
+| T3 carryover before/after year-end accrual | every salaried Dec 31 | measures carryover before the Dec accrual | accrual first, then forfeiture (D-9) |
+| T4 cancelled after year end | S02: E013 Dec 16–17 approved Dec 3, cancelled 2025-01-08 | restores 960 into 2025 | reversal effective Dec 16/17; `CARRYOVER_RECOMPUTED` −960 on 2024-12-31; 2025 balance unchanged |
+| T5 leap day | E017 hired 2024-02-15 (salaried); E030 hired 2024-02-29 (hourly) | 15/28; anniversary on Mar 1 or never | 600×15/29 = 310; E030's boundaries 2025-02-28 (forfeit 1708) |
+| T6 request spanning Dec 31 | S01: E011 2024-12-30..2025-01-03 | counts 4 days in one year; counts Jan 1 | 2 usage rows in 2024, 2 in 2025 (Jan 1 holiday) |
+| T7 max-balance cap reopened | E003 opening 11600, tier 840 | keeps accruing, or never resumes | Jan 400 (440 capped), Feb 0, Mar 0, usage 960 in April, Apr 840, May 120 |
+| T8 insufficient balance | S04: E049 hired 2025-09-08 asks 10 days on 09-29; 32 more drawn | approves and goes negative | `DENIED INSUFFICIENT_BALANCE` at submit, chain still shown; 33 in total |
+| T9 termination | E019 leaves 2025-05-10; E022 2024-10-18; E021 2025-03-31 | full May accrual; Dec 31 forfeiture | May 2025: 720×10/31 = 232; no boundary after term |
+| T10 hourly → salaried | E033 hired 2023-04-03, transfer 2025-06-30 | tenure from transfer; no June accrual | anniversary forfeits 1569 (2024-04-03) and 2400 (2025-04-03); `TRANSFER_OUT/IN` 3454; Jun 30 accrual 24 = 720×1/30 (tier 720 from real hire) |
+| T11 retroactive sick across Jun 30 | S13: E024 sick 06-27..07-01 approved 07-03 | nothing | usage effective 06-27 and 06-30 land in the closed sick year; `CARRYOVER_RECOMPUTED` **+480** on 2025-06-30 (forfeiture given back) |
+
+**Scripted requests (routing traps):** S05 E027 submits 2025-04-01 after manager E021 left 03-31 and before the 04-03 reassignment → `APPROVER_INACTIVE_TO_MANAGER` → E003. S06 E014's manager changes E008→E009 on 05-12 while a request submitted 05-09 is pending → E009's approval **void**, E008 approves. S07 E041's 12-day request has an HR step on E006; E006's HR role is revoked 2025-10-01; E006's 10-02 approval is **void**, E007 (now primary) reassigns and approves. S08 E008's 7-day request on 2024-09-10: manager E002 delegates to E003 who delegates to E004 → `DELEGATION_DEPTH_EXCEEDED` → `FALLBACK_TO_HR` E006; skip-level E001. S09 E036 delegates to E037 who then requests 2 days → step dropped → `FALLBACK:E006[EMPTY_CHAIN_TO_HR,FALLBACK_TO_HR]`. S10 plain delegation E008→E009. S11 the CEO's request → `MANAGER:E006[MANAGER_OF_REQUESTER,CEO_MANAGER_IS_HR]`. S12 the HR primary's 11-day request → HR step is self → manager E005 → duplicate of step 1, dropped. S14 4-day sick → HR step. S15 pending at as-of. S16 denied by approver. S17 cancelled pending. S18 a peer approves first → void. S19 approved then cancelled in-year → reversals. S20 VP request while the CEO delegates to E005.
+
+**Not generated (say so in any write-up):** half days, overlapping requests, requests before hire or after termination, requests with zero working days, HR adjustments other than opening balances, policy edits mid-window, multiple delegations by one approver at once, delegations to inactive people, more than one HR revoke. Each is a candidate for a second seed.
+
+## 5. Calendar, accrual and ledger rules
+
+**Calendar (C).** C1 working days = Mon–Fri in the inclusive range minus `holidays.csv`. C2 pay period containing `d` ends on `anchor + (⌊(d − anchor)/14⌋ + 1)·14 − 1`. C3 `addMonthsClamped(d, n)`: same day `n` months on; a missing day clamps to the month's last day (2024-02-29 + 12 months = 2025-02-28). C4 `completedMonths(hire, d)` = `(d.y − h.y)·12 + (d.m − h.m)`, minus 1 if `d.day < min(h.day, daysIn(d.month))`. C5 `roundDiv(n, d, mode)`: `FLOOR` = `⌊n/d⌋`; `HALF_UP` = `⌊(2n + d) / 2d⌋`; n ≥ 0.
+
+**Accrual (A).**
+
+| ID | Rule |
+|---|---|
+| A1 | Event dates per frequency, inside the assignment and the ledger window: `MONTHLY` → last day of each month the assignment touches (the end month included); `PER_PAY_PERIOD` → each period end on which the assignment is active; `PER_HOURS_WORKED` → each period end with a timesheet row while active; `ANNIVERSARY` → each clamped anniversary of hire while active. |
+| A2 | Rate = the highest tier whose `min_tenure_months ≤ completedMonths(hire, eventDate)`. |
+| A3 | `MONTHLY` + `DAILY`: gross = `roundDiv(rate × activeDays, daysInMonth)` where activeDays counts days in the month inside the assignment; a full month is `rate` with no rounding and no `PRORATED_DAILY` code. |
+| A4 | `PER_HOURS_WORKED`: gross = `roundDiv(worked × minutes_per_60_worked, 60)`. `PER_PAY_PERIOD`/`ANNIVERSARY`: gross = rate. |
+| A5 | Max-balance cap: `room = max(0, max − balance(eventDate))` measured at posting time; posted = `min(gross, room)`; `capped_minutes = gross − posted`; code `MAX_BALANCE_CAP` when capped > 0. A 0-minute accrual is still a row. |
+| A6 | Year boundaries per `year.type` while the assignment is active on the boundary day; at end of that day `forfeit = max(0, balance(B) − carryover_cap)`; posted as `FORFEITURE` with code `CARRYOVER_FORFEITURE`, ref the boundary date. |
+| A7 | Any batch of posted non-forfeiture entries whose earliest effective date ≤ the latest processed boundary re-derives, for each processed boundary `B ≥` that date in order, `target = max(0, S(B) − cap)` where `S(B)` = Σ entries effective ≤ B excluding forfeitures effective exactly on B; `delta = target − existing forfeiture at B`; non-zero deltas post as `FORFEITURE` with code `CARRYOVER_RECOMPUTED`, effective B, posted now, ref the triggering request. One recompute per approval or cancellation. Accruals are never recomputed. |
+| A8 | Submit check: if `!allow_negative` and `available − requestMinutes < 0` → `DENIED`, code `INSUFFICIENT_BALANCE`, by `SYSTEM`, after the chain is computed. |
+
+**Ledger (L).** L1 `balance(asOf)` = Σ minutes with `effective ≤ asOf`. L2 `available` = Σ all posted minutes. L3 entry fields: `entry_id` (`L-` + 6-digit seq), `employee_id`, `leave_type`, `policy_id`, `kind`, `effective`, `posted`, `minutes` (signed), `capped_minutes`, `codes` (`+`-joined), `ref`, `seq`. L4 kinds and codes: `ACCRUAL` (`ACCRUAL_MONTHLY | ACCRUAL_PAY_PERIOD | ACCRUAL_HOURS_WORKED | ACCRUAL_ANNIVERSARY`, `+PRORATED_DAILY`, `+MAX_BALANCE_CAP`), `USAGE` (`USAGE_APPROVED`, ref request id, one per working day, posted on the approval date), `USAGE_REVERSAL` (`USAGE_REVERSED_CANCELLED`, mirrors each usage row, posted on the cancel date), `ADJUSTMENT` (`OPENING_BALANCE`), `FORFEITURE` (`CARRYOVER_FORFEITURE | CARRYOVER_RECOMPUTED`), `TRANSFER_OUT`/`TRANSFER_IN` (`POLICY_TRANSFER_OUT/IN`, ref the other policy, amount = balance as of the transfer date). L5 posting order within a day (D-9): opening adjustments, transfers, accruals → request events by (request id, seq) → boundaries.
+
+## 6. Routing rules (R) and codes
+
+Input: org state at the submit date (manager, roles, active), the policy, delegations, the requester, working days. Output: ordered steps, each `STEP:approver[code,code,…]`, dropped steps prefixed `~`.
+
+| ID | Rule | Codes |
+|---|---|---|
+| R1 | Plan the steps: `MANAGER` always; `SKIP_LEVEL` if working days > `skip_level_over_days`; `HR` if > `hr_over_days` (null = never). | `MANAGER_OF_REQUESTER`, `MANAGER_OF_MANAGER`, `HR_ROLE_HOLDER` |
+| R2 | The CEO's manager is the HR primary. The CEO's skip-level is also the HR primary (then collapsed by R8). | `CEO_MANAGER_IS_HR` |
+| R3 | An approver not employed on the submit date is skipped upward to their manager, repeatedly. | `APPROVER_INACTIVE_TO_MANAGER` |
+| R4 | If the resolved approver is the requester, use the requester's manager (R2/R3 apply). | `SELF_APPROVAL_TO_MANAGER` |
+| R5 | Delegation active on the submit date (`start ≤ submit ≤ end`) moves the step to the delegate, one hop. A delegate who is also delegating, or inactive, exceeds the depth → fallback **skipping the delegator** (R7′, D-56). A delegate who is the requester drops the step. A delegate for an HR-selected step must hold HR, else fallback **skipping the delegator** (R7′, D-44). Fallback approvers are never delegated. | `DELEGATED`, `DELEGATION_DEPTH_EXCEEDED`, `DELEGATE_IS_REQUESTER_STEP_DROPPED`, `DELEGATE_LACKS_HR_ROLE` |
+| R6 | HR primary = lowest employee id active and holding `HR` on the submit date. | — |
+| R7 | Fallback order: HR primary, then other HR holders by id, then the CEO; never the requester, never someone inactive. | `FALLBACK_TO_HR`, `FALLBACK_TO_CEO`, `UNROUTABLE` |
+| R7′ | After `DELEGATE_LACKS_HR_ROLE` (D-44) or `DELEGATION_DEPTH_EXCEEDED` (D-56): the first HR holder by id who is neither the requester nor the delegating approver; if none exists and the delegator holds HR, the delegator; otherwise R7 continues (the CEO). | `FALLBACK_TO_HR`, `FALLBACK_TO_DELEGATOR` |
+| R8 | A kept step whose approver already approves an earlier kept step is dropped. | `DUPLICATE_APPROVER_COLLAPSED` |
+| R9 | If no step is kept, append `FALLBACK` via R7. The chain is then **frozen**: nothing after submit re-routes it. | `EMPTY_CHAIN_TO_HR` |
+
+`stepRequiresHr(codes)`: walk the codes in order; `HR_ROLE_HOLDER`, `CEO_MANAGER_IS_HR`, `FALLBACK_TO_HR`, `EMPTY_CHAIN_TO_HR` set it, `SELF_APPROVAL_TO_MANAGER`, `FALLBACK_TO_CEO`, `APPROVER_INACTIVE_TO_MANAGER` clear it; the last wins. Used by S3 and by the delegate check in R5.
+
+## 7. Request state machine (S)
+
+| From | Action | To | Writes |
+|---|---|---|---|
+| DRAFT | SUBMIT | SUBMITTED | chain frozen (R1–R9); working days and minutes fixed (D-22) |
+| SUBMITTED | SYSTEM_DENY (D-45, checked first) | DENIED `OVERLAPPING_REQUEST` — the range intersects the same employee's PENDING or APPROVED request | — |
+| SUBMITTED | SYSTEM_DENY (A8) | DENIED `INSUFFICIENT_BALANCE` | — |
+| SUBMITTED | ROUTE (automatic) | PENDING step 1 | — |
+| PENDING k | APPROVE by eligible actor | PENDING k+1, or APPROVED after the last kept step | on APPROVED: one `USAGE` per working day (D-8) |
+| PENDING k | DENY by eligible actor | DENIED `DENIED_BY_APPROVER` | — |
+| PENDING k | CANCEL by requester or HR holder | CANCELLED `CANCELLED_PENDING` | — |
+| PENDING k | REASSIGN by HR holder | PENDING k (approver replaced) | — |
+| APPROVED | CANCEL by requester or HR holder | CANCELLED `CANCELLED_AFTER_APPROVAL` | one `USAGE_REVERSAL` per usage row (S4), then A7 |
+| any terminal | anything (except APPROVED+CANCEL) | unchanged | log `IGNORED_TERMINAL` (S6) |
+
+S3 eligibility for APPROVE/DENY: actor == step's current approver (`APPROVER_NOT_STEP_APPROVER`), actor employed on the event date (`APPROVER_INACTIVE`), and holds `HR` if `stepRequiresHr` (`APPROVER_INELIGIBLE_ROLE_REVOKED`). Failing events are **void**: logged as `VOID_<ACTION>:actor:date:code`, nothing changes. CANCEL by someone else: `CANCEL_NOT_REQUESTER_OR_HR` (void). REASSIGN by a non-HR actor: `REASSIGN_NOT_HR` (void). The log line format is `ACTION:actor:date:code`; `SUBMIT` logs `CHAIN_FROZEN`; `APPROVE`/`DENY` log the step id.
+
+## 8. Golden cases — accrual (hand-derived, exact minutes)
+
+Each case is a tiny world (one employee, the §3 policy named, ledger from 2024-01-01) run through the simulation; "as of" values use L1. Confirmed by `tools/golden_answers.py`.
+
+| ID | Scenario | Derivation | Expected |
+|---|---|---|---|
+| GA-01 | Salaried, hired 2024-01-01 | nothing before the month end | balance 01-30 = **0**, 01-31 = **600** |
+| GA-02 | Salaried, hired 2024-03-17 | 600 × 15/31 = 290.32 → HALF_UP | 03-31 = **290**, 04-30 = **890** |
+| GA-03 | Salaried, hired 2024-02-15 (leap month) | 600 × 15/29 = 310.34 | 02-29 = **310** |
+| GA-04 | Hand policy 605/month, hired 2024-04-28 | 605 × 3/30 = 60.5 → HALF_UP | 04-30 = **61** |
+| GA-05 | Salaried, hired 2022-08-20 (tier at 24 months) | Jul 31: 23 months → 600; Aug 31: 24 → 720; 7×600 + 720 | Jul **600**, Aug **720**, balance 08-31 = **4920** |
+| GA-06 | Salaried, hired 2024-01-01, no usage, Dec 31 | 12×600 = 7200; Dec accrual first, then forfeit 7200 − 2400 | 12-30 = **6600**, 12-31 = **2400**, forfeited **4800** |
+| GA-07 | Salaried, tier 840, opening 11600, max 12000; 2 days used Mar 4–5 | Jan min(840, 400); Feb/Mar room 0; usage −960; Mar 31 room 960 → 840; Apr room 120 | Jan **(400, capped 440)**, Feb **(0, 840)**, Mar **(840, 0)**, Apr **(120, 720)**; 04-30 = **12000** |
+| GA-08 | Request 2024-07-03..07-08 approved | Jul 4 holiday, 6–7 weekend | usage rows **07-03, 07-05, 07-08**, −480 each |
+| GA-09 | Hired 2024-01-01; request 2024-12-30..2025-01-03 approved | Dec 30, 31, Jan 2, 3 (Jan 1 holiday); Dec 31: 7200 − 960 = 6240 → forfeit 3840 → 2400; Jan: −960 + 600 | 2024 used **960** forfeited **3840**; 2025 used **960**; 01-31 = **2040** |
+| GA-10 | Hired 2024-01-01; Dec 16–17 approved 12-03, cancelled 2025-01-08 | Dec 31 first: 6240 → forfeit 3840; reversal +960 effective Dec 16/17 → S(Dec 31) = 7200 → target 4800 → one recompute −960 | 2024 used **0**, forfeited **4800**; balance 2025-01-08 = **2400**; forfeiture rows `[12-31 −3840 CARRYOVER_FORFEITURE, 12-31 −960 CARRYOVER_RECOMPUTED]` |
+| GA-11 | Hourly; periods 4790 then 4800 worked | 4790/30 = 159.67 → FLOOR; 4800/30 | **[159, 160]** |
+| GA-12 | Hourly, hired 2024-02-29, 4800 every period | 26 period ends 2024-03-10..2025-02-23 × 160 = 4160; boundary = 2025-02-28 (C3); forfeit 1760; 03-09 +160 | 02-27 = **4160**, forfeited at 02-28 **1760**, 03-09 = **2560** |
+| GA-13 | Sick, hired 2024-03-20 | active on period end 03-24; NONE proration | 03-24 = **120** |
+| GA-14 | Sick, opening 2700, max 2880, Jun 30 cap 2400 | 01-14 +120, 01-28 +60 (capped), then 0×11; Jun 30 accrual 0 then forfeit 480; Jul 14 +120 | accrued by 06-30 **180**, 06-30 = **2400**, forfeited **480**, 07-14 = **2520** |
+| GA-15 | Salaried hired 2024-03-01; 5 days (2400) submitted 03-04 | available 0, negative not allowed | **DENIED INSUFFICIENT_BALANCE**, no usage, 03-31 = **600** |
+| GA-16 | Sick hired 2024-03-01; 2 days submitted 03-05 approved 03-06 | negative allowed; 03-10 +120 | **APPROVED**, 03-06 = **−960**, 03-10 = **−840** |
+| GA-17 | Hired 2024-01-01; Jun 10–11 approved 05-10; Jun 17–20 (1920) submitted 05-15 | balance 05-15 = 2400 (L1) but available = 2400 − 960 = 1440 (L2) | balance **2400**, available **1440**, second request **INSUFFICIENT_BALANCE** |
+| GA-18 | Hourly hired 2024-01-01, 4800/period, transfer to salaried 2025-06-30 | 2024: 26×160 = 4160; boundary 2025-01-01 → forfeit 1760 → 2400; 13 periods to 06-29 → 4480; transfer ±4480; Jun 30: 17 months → 600 × 1/30 = 20; Jul 600 | 06-29 = **4480**; `TRANSFER_OUT PTO_HOURLY −4480`, `TRANSFER_IN PTO_SALARIED 4480`; Jun 30 accrual **20** `ACCRUAL_MONTHLY+PRORATED_DAILY`; 07-31 = **5100** |
+| GA-19 | Salaried hired 2024-01-01, terminated 2024-05-10 | May: 600 × 10/31 = 193.5 → 194; nothing after; no Dec 31 boundary | 05-31 = **2594**, 2025-12-31 = **2594**, **5** rows |
+| GA-20 | Hand policy: 4800 on each anniversary, hired 2023-05-15, CALENDAR cap 4800 | grants 2024-05-15, 2025-05-15; Dec 31 2024 at cap → no forfeit; Dec 31 2025 9600 → 4800 | 2024-05-14 = **0**, 2024-12-31 = **4800**, 2025-05-15 = **9600**, 2025-12-31 = **4800** |
+
+Reading the traps: GA-06 and GA-14 move if the posting order (D-9) moves. GA-10 is the one most HR systems get wrong one way or the other: the naive answer puts 960 back into January; the alternative policy (O-4) is open, the default is stated. GA-17 is why two numbers exist. GA-18's 20-minute June accrual is correct and will look like a bug.
+
+## 9. Golden cases — routing (hand org, exact chains)
+
+Hand org: H1 CEO; H2 VP (→H1); H3 manager (→H2); H4, H5 ICs (→H3); H6 VP People (→H1); H7 HR Manager, `HR` (→H6); H8 HR Generalist, `HR` (→H7); H9 manager (→H2), terminated 2025-03-31; H10 IC (→H9). PTO policy = `PTO_SALARIED` (skip > 5, HR > 10); SICK = `SICK_STD` (no skip, HR > 3). Submit 2025-05-05 unless stated. Delegations are active on the submit date.
+
+| ID | Case | Expected chain |
+|---|---|---|
+| GR-01 | H4, 2 days | `MANAGER:H3[MANAGER_OF_REQUESTER]` |
+| GR-02 | H4, 6 days | `MANAGER:H3[MANAGER_OF_REQUESTER]\|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]` |
+| GR-03 | H4, 11 days | `…\|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]\|HR:H7[HR_ROLE_HOLDER]` |
+| GR-04 | H4, 2 days; H3 → H5 | `MANAGER:H5[MANAGER_OF_REQUESTER,DELEGATED]` |
+| GR-05 | H4, 2 days; H3 → H5 and H5 → H2 | `MANAGER:H7[MANAGER_OF_REQUESTER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_HR]` |
+| GR-06 | H7 (HR primary), 11 days | `MANAGER:H6[MANAGER_OF_REQUESTER]\|SKIP_LEVEL:H1[MANAGER_OF_MANAGER]\|~HR:H6[HR_ROLE_HOLDER,SELF_APPROVAL_TO_MANAGER,DUPLICATE_APPROVER_COLLAPSED]` |
+| GR-07 | H1 (CEO), 2 days | `MANAGER:H7[MANAGER_OF_REQUESTER,CEO_MANAGER_IS_HR]` |
+| GR-08 | H1, 11 days | `MANAGER:H7[MANAGER_OF_REQUESTER,CEO_MANAGER_IS_HR]\|~SKIP_LEVEL:H7[MANAGER_OF_MANAGER,CEO_MANAGER_IS_HR,DUPLICATE_APPROVER_COLLAPSED]\|~HR:H7[HR_ROLE_HOLDER,DUPLICATE_APPROVER_COLLAPSED]` |
+| GR-09 | H2 (VP), 6 days | `MANAGER:H1[MANAGER_OF_REQUESTER]\|SKIP_LEVEL:H7[MANAGER_OF_MANAGER,CEO_MANAGER_IS_HR]` |
+| GR-10 | H4, 2 days; H3 → H4 (the requester) | `~MANAGER:H4[MANAGER_OF_REQUESTER,DELEGATED,DELEGATE_IS_REQUESTER_STEP_DROPPED]\|FALLBACK:H7[EMPTY_CHAIN_TO_HR,FALLBACK_TO_HR]` |
+| GR-11 | H4, 6 days; H3 → H2 | `MANAGER:H2[MANAGER_OF_REQUESTER,DELEGATED]\|~SKIP_LEVEL:H2[MANAGER_OF_MANAGER,DUPLICATE_APPROVER_COLLAPSED]` |
+| GR-12 | H10, 2 days, submit 2025-04-07 (H9 gone) | `MANAGER:H2[MANAGER_OF_REQUESTER,APPROVER_INACTIVE_TO_MANAGER]` |
+| GR-13 | H4, SICK 4 days | `MANAGER:H3[MANAGER_OF_REQUESTER]\|HR:H7[HR_ROLE_HOLDER]` |
+| GR-14 | H4, 11 days; H7 → H8 | `MANAGER:H3[…]\|SKIP_LEVEL:H2[…]\|HR:H8[HR_ROLE_HOLDER,DELEGATED]` |
+| GR-15 | Frozen chain and eligibility. Q1: H4 2 days; H4's manager becomes H2 on 05-07; H2 approves 05-08, H3 approves 05-09. Q2: H4 11 days; H7's HR role revoked 05-06; H3, H2 approve; H7 approves 05-08; H8 reassigns to H8 05-09; H8 approves 05-12 | Q1 chain `MANAGER:H3[MANAGER_OF_REQUESTER]`, log `SUBMIT…CHAIN_FROZEN; VOID_APPROVE:H2:2025-05-08:APPROVER_NOT_STEP_APPROVER; APPROVE:H3:2025-05-09:MANAGER`, **APPROVED**. Q2 chain `…HR:H7[HR_ROLE_HOLDER]`, log tail `VOID_APPROVE:H7:2025-05-08:APPROVER_INELIGIBLE_ROLE_REVOKED; REASSIGN:H8:2025-05-09:STEP_REASSIGNED->H8; APPROVE:H8:2025-05-12:HR`, **APPROVED** |
+| GR-16 | D-44. (a) H4, 11 days; H7 → H5 (no HR) on the submit date. (b) the same, with H8's HR role revoked 2025-05-01 | (a) `MANAGER:H3[MANAGER_OF_REQUESTER]\|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]\|HR:H8[HR_ROLE_HOLDER,DELEGATE_LACKS_HR_ROLE,FALLBACK_TO_HR]` (b) `…\|HR:H7[HR_ROLE_HOLDER,DELEGATE_LACKS_HR_ROLE,FALLBACK_TO_DELEGATOR]` |
+| GR-17 | D-45. H4 (PTO and SICK, opening 2400 PTO): P1 PTO 05-19..05-20 submitted 05-05, approved by H3 05-06; P2 SICK 05-20..05-21 submitted 05-07; P3 PTO 05-21..05-22 submitted 05-07; H4 cancels P1 05-08; P4 PTO 05-19 submitted 05-09; P5 PTO 05-22 submitted 05-09 | P2 **DENIED `OVERLAPPING_REQUEST`** (overlaps the approved P1 though another leave type), chain `MANAGER:H3[MANAGER_OF_REQUESTER]` still shown, log `SUBMIT:H4:2025-05-07:CHAIN_FROZEN; SYSTEM_DENY:SYSTEM:2025-05-07:OVERLAPPING_REQUEST`; P3 **PENDING_1** (adjacent to P1; the denied P2 does not block); P4 **PENDING_1** (P1 is cancelled); P5 **DENIED `OVERLAPPING_REQUEST`** (overlaps the pending P3) |
+| GR-18 | D-56. (a) H4, 11 days; H7 → H5 and H5 → H2 on the submit date. (b) the same, with H8's HR role revoked 2025-05-01. (c) H4, 2 days; H3 → H5 and H5 → H2; H7's and H8's HR roles revoked 2025-05-01 | (a) `MANAGER:H3[MANAGER_OF_REQUESTER]\|SKIP_LEVEL:H2[MANAGER_OF_MANAGER]\|HR:H8[HR_ROLE_HOLDER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_HR]` (b) `…\|HR:H7[HR_ROLE_HOLDER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_DELEGATOR]` (c) `MANAGER:H1[MANAGER_OF_REQUESTER,DELEGATION_DEPTH_EXCEEDED,FALLBACK_TO_CEO]` (a non-HR delegator never gets `FALLBACK_TO_DELEGATOR`) |
+
+GR-05 and GR-10 are the two ways a request can lose its manager step; both land on HR, with different codes, so the inbox can say why. GR-08 is O-9. GR-11 is the trap where a naive engine asks H2 twice.
+
+## 10. Eval output format
+
+`tools/reference_leave.py` (and `leave:eval`) print, in this order: fixture window and employee count; ledger entries by kind; accrual codes with counts; recomputed forfeitures; requests by final state (`PENDING_k` for open ones) and final code; kept steps per request; routing codes with counts; void and ignored event counts; per-year totals by leave type; then the employee-year table `employee_id year type opening accrued capped used forfeited balance_end`. With `--requests`: `request_id employee leave_type start..end wd=N final_state final_code chain`. Diffs are against `fixtures/ledger.csv`, `expected_balances.csv`, `expected_requests.csv`, byte for byte.
+
+## 11. Reference measurements (kickoff, seed 20261025, as of 2025-12-31)
+
+`tools/reference_leave.py` on the frozen fixtures. **These are the oracle's answers to the generator's own scripted traps, written by the same author.** They are the target the TypeScript engines must reproduce with 0 diffs; they are not evidence that any policy is right for any real company.
+
+| Measure | Value |
+|---|---|
+| Ledger entries | **5057**: ADJUSTMENT 86 · ACCRUAL 3986 · USAGE 760 · USAGE_REVERSAL 70 · FORFEITURE 153 · TRANSFER_OUT 1 · TRANSFER_IN 1 |
+| Accrual codes | ACCRUAL_HOURS_WORKED 726 · ACCRUAL_MONTHLY 802 · ACCRUAL_PAY_PERIOD 2458 · MAX_BALANCE_CAP 1028 (SICK 953, HOURLY 61, SALARIED 14) · PRORATED_DAILY 6 |
+| Forfeitures | 151 `CARRYOVER_FORFEITURE` (Dec 31: 67, Jun 30: 63, anniversaries: 21) + **2** `CARRYOVER_RECOMPUTED` (E013 −960, E024 +480) |
+| Requests | **389** (PTO 260, SICK 129; 20 scripted, 369 drawn); working days 1: 143, 2: 111, 3: 30, 4: 54, 5: 25, 6–12: 26 |
+| Final states | APPROVED 294 · DENIED 55 (DENIED_BY_APPROVER 22, INSUFFICIENT_BALANCE 33) · CANCELLED 39 (after approval 28, pending 11) · PENDING_2 1 |
+| Kept steps per request | 1 step: 355 · 2 steps: 33 · 3 steps: 1 |
+| Routing codes | MANAGER_OF_REQUESTER 389 · MANAGER_OF_MANAGER 26 · HR_ROLE_HOLDER 12 · CEO_MANAGER_IS_HR 15 · DELEGATED 12 · DELEGATION_DEPTH_EXCEEDED 2 · DELEGATE_IS_REQUESTER_STEP_DROPPED 2 · EMPTY_CHAIN_TO_HR 2 · FALLBACK_TO_HR 4 · DUPLICATE_APPROVER_COLLAPSED 3 · SELF_APPROVAL_TO_MANAGER 1 · APPROVER_INACTIVE_TO_MANAGER 1 |
+| Void events / ignored events | **15** / **0** |
+| Usage rows posted after their effective date (retroactive) | 134 |
+| 2024 PTO (49 rows) | accrued 344027 · capped 13066 · used 95040 · forfeited 199095 · balance_end 127112 |
+| 2024 SICK (49) | accrued 113010 · capped 35670 · used 47040 · forfeited 9750 · balance_end 119740 |
+| 2025 PTO (50) | accrued 355172 · capped 5946 · used 146880 · forfeited 212505 · balance_end 122899 |
+| 2025 SICK (50) | accrued 69290 · capped 76990 · used 42240 · forfeited 16460 · balance_end 130330 |
+
+What the numbers say: 8.5% of requests are refused by the balance check, almost all hourly employees or January requests after a 5-day carryover cap — the policy as written, not a defect. Most sick accruals are capped (953 of 2458) because 3120 minutes accrue a year against a 2880 max and few sick days are taken; the policy editor should show that. The full per employee-year table is `fixtures/samples/reference_output.txt` (198 rows). Codes with count 0 in the fixtures (`DELEGATE_LACKS_HR_ROLE`, `FALLBACK_TO_CEO`, `UNROUTABLE`, `IGNORED_*`, `CANCEL_NOT_REQUESTER_OR_HR`, `REASSIGN_NOT_HR`) are covered only by unit tests the first session writes from §6–§7.
+
+## 12. Frozen fixtures
+
+```
+python3 -I tools/build_fixtures.py --seed 20261025            # writes fixtures/ (inputs + MANIFEST.json)
+python3 -I tools/reference_leave.py --write-expected          # writes ledger.csv, expected_balances.csv, expected_requests.csv; prints §11
+python3 -I tools/verify_fixtures.py                           # regenerates to a temp dir, compares every sha256, runs golden_answers; prints OK
+```
+
+| File | Rows | sha256 |
+|---|---|---|
+| policies.json | 3 policies | `749f50b88106b4f2291b2e0819c6a5b6a0003c96a88e0f23fca6b6eac634f18c` |
+| employees.csv | 50 | `05402a209590594e16921302fc83bae2579b47351981109d81756f9466fb8842` |
+| assignments.csv | 101 | `12d117c04fed959d1b770eb806315b5b89a926202892e912f358fc41b992af19` |
+| holidays.csv | 16 | `47e928e4a4efed89aa5cddd983ce89f634adee47a80ca458d3efb95dcf2481f5` |
+| timesheets.csv | 726 | `6b8888122d7934b71ceaf93a0eda8e8fd658221bcd4e6a5db2edc0ba3665a094` |
+| delegations.csv | 14 | `ff194bd28b90a512baa329234c9689782ec129b792a755d41d7121ca3d55d8c4` |
+| org_changes.csv | 11 | `85272bfd5f43022c4b2524b5197f7549580543ec4fe9f3f5438f7bb2c73215f3` |
+| opening_balances.csv | 86 | `6fe72d09e7e3b9e02e204ec108805ed6a25c3845c229d0b6724b8c656353fe64` |
+| requests.csv | 389 | `529e33425a6be2800728a9de172495b26cb45483bd41c1615f3ad83cf9ec57d9` |
+| request_events.csv | 813 | `1894fa4b1358d2b37c0d562c78fd05fe87d5843587df018608b9cb39f395ed3e` |
+| ledger.csv (reference engine) | 5057 | `86ab4ebecabfcd7ebece36f29f8ea99c9318485640b4359b5619d7a2b1025901` |
+| expected_balances.csv (reference engine) | 198 | `23fe55b4e91424e01e1448e6979dcbfe75177733b2234c5975badfe8df003dc1` |
+| expected_requests.csv (reference engine) | 389 | `90cdd09ae125e05e8d31da8e8c8fdbf295a69a15a9b7419bb1086d5d1a6bf13e` |
+
+Generated twice in separate directories at kickoff with identical bytes for all 13 files above and `MANIFEST.json`. `fixtures/MANIFEST.json` holds the input hashes, counts and the trap list; `verify_fixtures.py` regenerates the three reference-engine files too when they are present. Product code never reads `ledger.csv` or `expected_*.csv`; only `leave:eval` and `ledger:verify` do.
+
+Column sets: `employees.csv` `employee_id,name,title,dept,manager_id,employment_type,roles,hire_date,term_date` · `assignments.csv` `employee_id,leave_type,policy_id,start,end` · `timesheets.csv` `employee_id,period_end,minutes_worked` · `delegations.csv` `approver_id,delegate_id,start,end` · `org_changes.csv` `effective,employee_id,field,old,new` · `opening_balances.csv` `employee_id,leave_type,minutes` · `requests.csv` `request_id,employee_id,leave_type,start,end,submitted_on,trap` · `request_events.csv` `request_id,seq,on,actor,action,target` · `ledger.csv` per L3 · `expected_balances.csv` `employee_id,year,leave_type,opening,accrued,capped,used,forfeited,balance_end` · `expected_requests.csv` `request_id,employee_id,leave_type,policy_id,start,end,submitted_on,working_days,minutes,chain,final_state,final_code,log`.

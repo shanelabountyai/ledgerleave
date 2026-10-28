@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "incremental": false, "plugins": [] },
+  "include": ["src/accrual", "src/routing", "scripts/leave", "tests/unit/leave"],
+  "exclude": ["node_modules"]
+}

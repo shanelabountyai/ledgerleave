@@ -1,166 +1,242 @@
 # NEXT
 
-## ▶ v1.3.0 released 2026-10-14 (model: Opus — permissions)
+## ▶ Next item: deploy Ledgerleave as a password-gated demo (D-57), then the cost review
 
-✅ **Good to clear.** `scorekeeper` role + `results.write` (D-21), a `security:` release for two INV-22/INV-28 latent defects
-the new role exposed. 172 tests pass (4 new), lint and typecheck clean; e2e and `check-modules` run in CI on the push and tag.
-Bracketry merged it the same day for L-040. **Every other clone owes v1.3.0 by 2026-10-21** (with v1.2.1, due 10-20), each in
-its own session.
+Done 2026-10-27 (`a8ce2aa`, `4080a55`): steps 1–5 of the checklist.
+- D-57 recorded; CLOSEOUT, DEMO.md and the `~/.claude/CLAUDE.md` port row no longer say "not deployed".
+- Gate: `src/proxy.ts` + `src/app/demo-gate.ts` + `tests/unit/demo-gate.test.ts` (ported from boxloop via gavel); `FOUNDATION_PATCHES.md` row `0012a96281ad`; drift clean; `npm test` 414 passed / 53 files.
+- `npm run seed:cloud`: the only script that reads `.env.cloud` and sets `ALLOW_CLOUD_DB=1`. Runs migrate deploy, seed-demo, leave:import, leave:replay, leave:seed:walk.
+- Cron removed from `vercel.json` (restore note in D-57). `CRON_SECRET` stays unset, so `/api/cron` refuses everything (INV-11).
+- `.env.cloud` created (gitignored), empty `DATABASE_URL=`, `DIRECT_URL=`, `AUTH_SECRET=`; `APP_URL` set.
 
-## ▶ Next session here: talk4me is next in the older queue if picked up; storage SEC-01/02 runs in its own folder (Opus, money)
+Still to do:
+6. Neon + Vercel + Cloudflare (commands below).
+7. `npm run seed:cloud`, then re-run `docs/DEMO.md` against https://leave.labintelligence.co; fix what breaks.
+8. Exec-brief and demo links as first comments on Ledger posts 135/136; exec brief's "not deployed" line; cost review with a baseline; CLOSEOUT artifacts table; D-58 recording what production found.
 
-✅ **Good to clear.** **`v1.2.1` released and pushed 2026-10-13** (model: Opus — `security:` release). Four fixes from the
-2026-10-12 review, each with a red-first test: stale invites (`e47af9a`), the email-change oracle (`71b5fd8`), demo sessions
-(`2cc20a8`), and the owner's 2026-10-13 decision that a demo session also cannot create an org or use billing (`4cae624`).
-168 tests pass, typecheck and lint clean. No schema change. **Every clone owes this within 7 days (due 2026-10-20)**, each in
-its own session; `CLONES.md` rows stay as they are until each merges. Not run locally: `foundation:check-modules` and the
-e2e sweep (both build) — CI runs them on the push and on the tag.
+Commands (Neon org `org-morning-smoke-06224724`, Vercel scope `shanelabountyai-8212s-projects`):
+```bash
+neonctl projects create --name ledgerleave --region-id aws-us-east-2 --org-id org-morning-smoke-06224724
+neonctl connection-string --project-id <id> --pooled   # -> DATABASE_URL (.env.cloud and Vercel)
+neonctl connection-string --project-id <id>            # -> DIRECT_URL  (.env.cloud and Vercel)
+vercel link --yes --project ledgerleave --scope shanelabountyai-8212s-projects   # creates the project; Root Directory stays "."
+vercel git connect https://github.com/shanelabountyai/ledgerleave
+printf 1 | vercel env add DEMO_MODE production
+printf 0 | vercel env add EMAIL_ENABLED production     # INV-13: no Resend in the demo; sign-in is /demo only
+printf https://leave.labintelligence.co | vercel env add APP_URL production
+vercel env add DEMO_ACCESS_PASSWORD production         # secret: Shane pastes
+vercel env add AUTH_SECRET production                  # secret: same value as .env.cloud
+vercel env add DATABASE_URL production                 # secret: pooled
+vercel env add DIRECT_URL production                   # secret: direct
+vercel domains add leave.labintelligence.co ledgerleave
+# Cloudflare: A record  leave -> 76.76.21.21, DNS only (grey cloud)
+```
+Production branch: the repo deploys `main`; branch `kickoff` (PR #1) is not merged. Either merge PR #1 or set the production branch to `kickoff` in Vercel.
 
-**Older checkpoint (superseded above):** **F-03 done and pushed 2026-09-28, tagged `v1.2.0`** (model: Sonnet — spec-following tooling, no new
-logic). A clone declares a module required in the clone-owned `src/app/required-modules.ts`; `foundation:check-modules`
-(`scripts/foundation-modules.ts`'s new `modulesToRemove()`) leaves that module in place and still removes the rest. 3 new
-unit tests (157 total pass), the filter mutation-checked red (dropped it, confirmed the test failed, restored). Verified
-for real, not just unit-tested: ran `foundation:check-modules` once with `notifications` required — passed with only
-billing removed and `notifications` left in place — and once with the template's default (nothing required) to confirm
-the existing CI job is unchanged. **Also fixed in passing:** `FOUNDATION_VERSION` was still `v1.1.0` — the `v1.1.1`
-release (`a121708`) never bumped it, a step the release process (`IMPLEMENTATION_PLAN.md` §3.3) requires; a clone created
-between those two commits would have stamped the wrong base version. Now `v1.2.0`, current.
-**Not done, on purpose:** callboard hasn't merged the release yet — that's callboard's own session, per the established
-pattern (it still owes `v1.1.0` and the `security:` `v1.1.1` too, due 2026-10-05). Its `CLONES.md` row stays `v1.0.1`
-until then.
+Ledger posts 135 (AI) and 136 (Impact) are drafted and tightened with a one-line project setup; both unposted. https://claude.ai/artifact/Ai5xKScgT2sWtqXRQ1ZA8i
 
-**CI fixed 2026-09-28** (`37cf7c4`, model: Opus — real regression, not a stale-test triage). Root cause: `e2e/billing.spec.ts`
-still injected a cookie named `session` via `context.addCookies`; K1 (`a121708`) had renamed the real cookie to `__Host-session`.
-Fixed to the new name — but Chromium's CDP rejects a `__Host-` cookie set with a plain `http://` `url` field ("Invalid cookie
-fields"), so it's set via `domain: 'localhost', path: '/', secure: true` instead, which Chromium accepts and still sends over
-`http://localhost` (treated as a secure context). Verified: 10/10 e2e, 154/154 unit+integration, lint/typecheck clean, `gh run
-watch` on the push shows green. Clones (tradepost, pulseboard, callboard) can now safely take v1.1.1.
+---
 
-✅ **Good to clear.** 6 of 8 LOWs fixed and pushed 2026-09-28 (`a121708`, tagged **`v1.1.1`**, model: Sonnet — `security:` release,
-**clones (tradepost, pulseboard, callboard) owe this within 7 days, by 2026-10-05**). 10 new tests (154 total pass, 1 file:
-`tests/integration/low-2026-09-28.test.ts`), each of the 5 test-covered fixes (K1 x2, K2, K5, K6, K13) mutation-checked red by
-reverting just that source file with the new test in place, confirming failure, then restoring — not just asserted done.
-Typecheck and lint clean.
-- **K1** (`session.ts`, `link.ts`): `signOutEverywhere`/`confirmEmailChange` now also spend the user's other unused sign-in
-  links, atomically with the session/email change. Cookie renamed `session` → `__Host-session`, `Secure` unconditional.
-- **K2** (`totp.ts`): `confirmTotp` now runs `assertFresh` and claims enrolment via a conditional `updateMany` on
-  `totpEnrolledAt: null`, so a concurrent second confirm loses the race instead of also minting 10 more recovery codes.
-- **K5** (`http.ts`): IPv6 rate-limit key now scoped to the address's first 64 bits, not the exact address.
-- **K6** (`orgs.ts`): `removeMember` now revokes that user's active share links in the org, same transaction as the delete.
-- **K13** (`invites.ts`, `links.ts`, `projects/actions.ts`): `addProject`, `createShareLink`, `revokeShareLink`,
-  `revokeInvite` now wrap their write and `audit()` call in one `db.$transaction`. Only `invites.ts` has direct mutation-check
-  coverage in the new test file; `links.ts`/`actions.ts` got the identical pattern, not separately mutation-checked.
-- **Not fixed, deferred on purpose** (see `audit/FOUNDATION-REVIEW-2026-09-26.md` LOW section): K13's `audit_append_only`
-  role separation (needs a second non-owner Postgres role — real infra change, add if the audit log ever needs to survive a
-  compromised app role) and the `.env.example`/drift tooling item (already accepted, documented behavior, D-19d).
-- **Not done, on purpose**: clone upgrade notes for v1.1.1 in tradepost/pulseboard/callboard's own `NEXT.md` — each clone
-  upgrades in its own session, per the established pattern; they're still behind (all at v1.0.1 per `CLONES.md`) and now
-  owe both v1.1.0 and this v1.1.1 `security:` release.
+### DEMO.md, 2026-10-27
 
-**Older checkpoint (superseded above):** FR-09..11 done and pushed 2026-09-28 (`d422d1a`, tagged **`v1.1.0`**, model: Sonnet). 5 new tests (144 total
-pass), each confirmed red against the prior behavior before its fix (patched-to-old-code, ran, restored). Typecheck and lint clean.
-- **FR-09**: `FOUNDATION_PATCHES.md` entries now carry a hash of the excused diff (`` `path` `hash` — reason ``); `foundation:drift`
-  fails again once that path's diff moves on, instead of excusing it forever. Error message prints the hash to paste in.
-- **FR-10**: Billing nav link in `layout.tsx` marked `{/* billing */}` (JSX — a trailing `//` renders as literal text) and added to
-  `MARKED_FILES`. Verified end-to-end: ran `foundation:check-modules` for real, confirmed `/o/[org]/settings/billing` is gone from
-  the build output and drift stays clean.
-- **FR-11**: `new-project` now refuses a port already `in use`/`reserved` in `~/.claude/CLAUDE.md`'s port table (best-effort, skips
-  if the file is unreadable), and refuses a second run once `package.json`'s name is no longer `saas-foundation`.
-- **Not done, on purpose**: clone upgrade notes for v1.1.0 — FR-09..11 is tooling, not a `security:` release, so no 7-day clock;
-  each clone (tradepost, pulseboard, callboard) picks up v1.1.0 whenever it next upgrades, in its own session.
-- **Also not done**: the 8 LOWs from `audit/FOUNDATION-REVIEW-2026-09-26.md` — queued, not urgent, "as time allows."
+- `npm run db:setup` wrote `.env.local` (with `DEMO_MODE=1`) and `.env.test` (both gitignored, pool-capped) and migrated `ledgerleave` + `ledgerleave_test`.
+- Ran every terminal command in the script: `leave:eval` 0 diffs (5057 / 198 / 389) · `ledger:verify` 198/0 · `leave:route` S05 and S04 · `engine:lint` 0 hits · `fixtures:check` OK · `leave:import` 813 commands · `leave:replay` 6688 then 0 rows, hash `d2a090f8…` · `ledger:verify:db` 198/0 · `leave:eval:db` 0 diffs · `npm start` serves `/demo` with 6 accounts.
+- New `npm run leave:seed:walk` (`seedDemoWalk` in `scripts/leave/seed-hand-org.ts`): the e2e walk's starting state, now shared by `e2e/leave.spec.ts` and the demo. Playwright `leave.spec.ts` + `demo.spec.ts`: 8 passed, 0 failed, against a production build.
+- CI green on `eb5ef0d`: https://github.com/shanelabountyai/ledgerleave/actions/runs/40563726906 (`ci`, `modules-removed`).
+- `foundation:drift` cannot run locally: no `v1.3.0` tag in this checkout (`git fetch template --tags` would fix it); only clone-owned files changed.
 
-**Decided 2026-09-26 (Shane): queue all of it for a fresh session; nothing was changed in code.** Findings, confirmed in source:
-`audit/FOUNDATION-REVIEW-2026-09-26.md` (no HIGH, 11 MED, 8 LOW). Order:
-1. ~~**FR-01 first**~~ **Done 2026-09-27, tagged `v1.0.2`** (lease claim, send outside tx, 15s fetch timeout; 3 new tests, 3 mutations red, 125 pass). Was: outbox sends inside a 5s interactive tx; a slow provider → delivered, not recorded, re-sent every cron run
-   and blocks the queue. Callboard's cron is `*/5`, so this is the live risk. Worth its own patch tag (v1.0.2) if the rest runs long.
-2. ~~FR-02..05~~ **Done 2026-09-27, tagged `v1.0.3`** (`8e4dd35`; 18 mutations red, 133 pass + 10/10 e2e, check-modules green). Clone notes added to each clone's NEXT.md (uncommitted there, beside the v1.0.2 note).
-   Choices: pending-MFA TTL 10 min; wrong-code cap 20/user/UTC day; invite caps 50/sender, 100/org, 5/recipient per day; the cancel hook lives in clone-owned `src/app/org-hooks.ts` (core may not import modules); concurrent pending checkouts still make two subs (ponytail note, logged).
-3. ~~FR-06/07/08~~ **Done 2026-09-28, untagged (CHANGELOG *Unreleased (1.1.0)*)**: `unguardedEntrypoints()` + `// public: <reason>` markers (14 files), glob all of `src/` + inline `'use server'` refused, id-like untagged fields throw (`notRef()` opt-out). 7 mutations red, 139 pass. Tag v1.1.0 after FR-09..11, then add each clone's upgrade note (their NEXT already says v1.1.0 follows).
-4. ~~FR-09/10/11 tooling~~ **Done 2026-09-28, tagged `v1.1.0`** (`d422d1a`). See the checkpoint note above.
-5. ~~LOWs (K1, K2, K5, K6, K13 writes)~~ **6 of 8 done 2026-09-28, tagged `v1.1.1`** (`a121708`). See the checkpoint note above.
-   Remaining 2 are deliberately deferred/no-action, not open work (K13 audit-role separation needs new infra; drift/.env.example
-   item is accepted behavior) — the LOW queue item is closed.
-Clones: tradepost (4200), pulseboard (4500), callboard (4600) — each upgrades in its own session. All three still owe v1.1.0
-*and* v1.1.1 (`security:`, due 2026-10-05) — neither has an upgrade note yet.
+## Was: closure deliverables, starting with `docs/DEMO.md`
 
-**Also done 2026-09-26:** clinic D-32 (group leader writes notes for own group only, `f35252c`) and rental SEC-16 / D-266
-(unrouted inbox portfolio-wide only, `58a0b5b`); CI green in both. Both repos had another session active at the time.
+Order (`~/.claude/CLAUDE.md` definition of done): `docs/DEMO.md` (run every command in it once; needs a local `.env.test`/`.env.local` first — none exist on this Mac) → exec brief (`exec-brief` skill) → LinkedIn posts in the Ledger → cost review (no deploy: CI minutes only). Record every artifact URL in `docs/CLOSEOUT.md`. Also still open: review/merge PR #1, build-log card #14, O-8.
 
-**Decided 2026-09-23: urgent live-security fixes run before foundation M0.** Each one is its own session, run in
-**that project's folder** (one session per project). The details for each are in that repo's *Security findings*
-section and in `audit/<repo>.md` here.
+### O-14 fixed, 2026-10-27 (D-56)
 
-**Session pick 2026-09-25: item 5 (storage SEC-01/02) runs on Opus, in the storage business folder, not here. Foundation has nothing open; safe to /clear.**
+One `fallback(…, delegator)` in `tools/leavelib.py` and `src/routing/route.ts` now serves both `DELEGATE_LACKS_HR_ROLE` (D-44) and `DELEGATION_DEPTH_EXCEEDED`: skip the delegator among HR holders; the delegator (`FALLBACK_TO_DELEGATOR`) only if it holds HR and nobody else does; a non-HR delegator still falls through to the CEO. Golden **GR-18** (3 parts). Regenerated: **0 bytes moved**. `golden_answers.py` OK · `leave:eval` 0 diffs (5057 / 198 / 389) · `fixtures:check` OK · `engine:lint` 0 hits · 181 engine tests green · `tsc` clean. CI green on `36d74ed`: https://github.com/shanelabountyai/ledgerleave/actions/runs/40544855392 (`ci`, `modules-removed`). `today.test.ts` cannot run on this Mac (no `.env.test`: missing `DATABASE_URL`, `AUTH_SECRET`, `APP_URL`); CI runs the full suite.
 
-**2026-09-26: Opus K4 pass done** (`audit/K4-SWEEP-2026-09-26.md`, scorecard v7). Rental K4 ✗ (3 HIGH, confirmed in source), clinic K4 ✗ (1 HIGH),
-alongside ✔, reservations N/A. Rental's Re-check processed: 10/14, not the 14/14 its own NEXT claims (K1, K6, K11 still ✗).
-Storage's Re-check stays queued in the artifact db until its SEC-01/02 edits are committed (they were uncommitted in flight at the time).
-Carried notes moved to `BACKLOG.md` (F-01, F-02). Items 9–10 were fixed the same day (scorecard v8: rental 11/14, clinic 10/14).
+### Mac session 2026-10-27 (done)
 
-## Queue (in order)
+- `proof/cap-2401` deleted from GitHub.
+- `prisma migrate diff … --exit-code` against a local shadow DB: **No difference detected**, exit 0 (D-54).
+- Port 7300 recorded in `~/.claude/CLAUDE.md` (D-55); 6300 stays the next free port.
+- Reuse scan: no missed donor (D-53).
+- Local checkout now has `node_modules` (`npm ci`; npm held back the install scripts for prisma, esbuild and unrs-resolver, and `migrate diff` ran anyway). There is no `.env.test` on this Mac yet: create it from the conventions recipe (`ledgerleave_test`, `?connection_limit=10&pool_timeout=20`) before the first local `npm test`.
 
-1. ~~**clinic: SEC-01 HIGH.**~~ **Live** (verified 2026-09-23): env vars set, pushed (`5f24c71`, in sync with origin),
-   `curl -I https://clinic.labintelligence.co/` returns 401 with a Basic challenge, and the cron route returns 401 with no challenge. gitleaks is clean (196 commits),
-   so `clearpath` was **made public** on 2026-09-23. **Done.**
-2. ~~**event toolkit: SEC-01 HIGH.**~~ Fixed (`2de11b8`); SEC-02 fixed too. **The repo is still blocked from going public:**
-   gitleaks flags a literal Vercel bearer token in `.claude/settings.json` (plus the ` 3`/` 4` copies), commit `b8310aa` (2026-08-14).
-   Shane: revoke that Vercel token. The files are no longer tracked, but they are not gitignored either, so add `.claude/settings*.json` to `.gitignore`. The token stays in history, so revoking it is the real fix.
-   SEC-03/04 (MED) are in progress in that folder (uncommitted edits).
-3. ~~**claude-dashboard: SEC-01 HIGH.**~~ Fixed (`a009fce`, pushed). The server binds to 127.0.0.1 and a LAN connection is refused. SEC-02 and OPS-01 are covered by the same fix. **Done.**
-4. ~~talk4me~~: **deferred to the end of the queue** (Shane, 2026-09-23). See item 8.
-5. **storage business: SEC-01, SEC-02** (webhook re-apply; cross-facility echo). Model: Opus (money). The repo was made private on 2026-09-23 because of these findings; make it public again once both are fixed.
-6. ~~design bridge~~: dead project (the API it needed cost too much), 2026-09-23. The repo stays private. SEC items dropped.
-7. ~~**Foundation M0**~~ **Done** 2026-09-23 (Shane chose to run it before storage). The repo `shanelabountyai/saas-foundation` is **private**.
-   The scaffold is pushed, and spikes S1–S3 all passed (the results are in spec §0). CI is lint + typecheck. Port 4100 is claimed in `~/.claude/CLAUDE.md`.
-   **M1 core platform: done** 2026-09-23 (env/clock/log/db + guard, headers, health, error pages, vitest, prod-build e2e, CI; INV-14, 15 (public + api), 18, 20 green).
-   **M2 Auth: done** 2026-09-23 in one session (est. 2). INV-05/07/09 (scoped to M2), 13, 15 (signed-in), 17, 23, 24, 25, 26 (TOTP) are green,
-   and each was mutation-checked red. The first migrations exist: core, billing and notifications, each separate (D-14d). Build choices are in spec **D-14**.
-   **M3 Tenancy + authz: done** 2026-09-23 in one session (est. 2). INV-01/02/03/04/22 run through the glob harness
-   (`tests/invariants/harness.ts`; six negative controls, and mutation-checked red on real code), plus INV-05 (membership removal),
-   06, 07 (invite), 09 (invite accepts), 19, 21 (including concurrent demotion), 26 (deletion) and 28, all green. D-13 confirmed; build choices are in spec **D-15**.
-   **M4 Share links: done** 2026-09-23. `Project` is the example resource, with `core/share/{links,project}.ts`, `/s/[token]` and `/o/[org]/projects`.
-   INV-07 (share link), 08, 09 (share reads) and 15 (share route) are green, each mutation-checked red (7 mutations). The e2e sweep passed 8/8. Build choices are in spec **D-16**.
-   **M5 Cron + secret hygiene: done** 2026-09-24. `core/cron.ts` (`isAuthorizedCron`: fails closed, `safeEqual`, header only), hourly `/api/cron`
-   (also sweeps `RateLimit` rows older than a day), `CRON_SECRET` in env + `.env.example`, `vercel.json` cron. INV-10/11/16 green, 5 mutations red. 84 unit/integration tests pass.
-   **M6 Billing: done** 2026-09-24. `modules/billing/{provider,webhook}.ts`, `/api/webhooks/stripe`, `/o/[org]/settings/billing` (+ nav link),
-   mock provider when no key. INV-12 green (13 tests, 8 mutations red, including the SB "any row = duplicate" bug and a dropped row lock).
-   98 unit/integration + 9/9 e2e. **Found and fixed a defect present since M1**: Prisma writes were stored 5–6h off in a non-UTC Postgres zone (D-17g).
-   Build choices are in spec **D-17**.
-   **M7 Notifications: done** 2026-09-24. `modules/notifications/{outbox,sms,templates}.ts`, drain + 7-day sweep in `/api/cron`, Twilio/SMS env keys.
-   11 new tests (109 total pass), 4 drain mutations red (no row lock, no backoff, no attempt cap, no sentAt filter). Build choices are in spec **D-18**.
-   **M8 Demo, clone tooling, release: done** 2026-09-25. `/demo` + `seed:demo` (INV-27, 3 mutations red), `new-project`, `db:setup`, `foundation:drift|status|check-modules`
-   (CI job `modules-removed`), README, legal stubs, CHANGELOG, CLONES. 122 tests + 10/10 e2e. **Tagged `v1.0.0`, then `v1.0.1`** (the acceptance run found the README's
-   `git checkout -b main` fails in a fresh clone; a pushed tag is not moved, so the fix is a patch release). Clone from **v1.0.1**. Acceptance run from a clean clone:
-   install to a working `/demo` sign-in took about 10s warm-cache (limit 30 min; not measured cold). Build choices in spec **D-19**.
-   **M9 scorecard: done** 2026-09-25, artifact https://claude.ai/artifact/TognMvisj8T9GNQGtE9MbJ. Foundation row all ✔ (122 tests). All rows re-scored 2026-09-25 by Sonnet agents (audit/rescore/*.json; design bridge stays baseline). K3/K4 spot-checks flagged; the Opus K3/K4 pass has not run. Per-project Re-check buttons queue requests in the artifact db (docs checks/<project-id>); process them by reading with ArtifactData, re-running that project's scorer, then writing doneAt + summary back.
-   **Clinic K11/OPS-04 cleanup landed 2026-09-25** (`clinic` a2e07eb: zod env schema, OPS-04 was already satisfied). Clinic is now 10/14. `audit/scorecard.json` and `build-scorecard.py` are updated and committed, but the artifact was republished (v5) with clinic at 10/14. **Next: storage (item 5)**, then talk4me. Earlier: storage (item 5) and talk4me (item 8).
-   - Not built, on purpose: `scripts/seed.ts`, `scripts/drain-outbox.ts` (nothing needs them).
-   - Shane, optional: to try real Stripe test mode, set `STRIPE_SECRET_KEY` (sk_test_), `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET` in `.env.local`
-     and forward with `stripe listen --forward-to localhost:4100/api/webhooks/stripe`. Not needed for M7.
-   - Carried notes: an audit-log viewer (`audit.read`) and `/o/[org]/settings/security` are not built. Neither is in any milestone yet, so add them to `BACKLOG.md` if wanted.
-   - The harness takes ~2.5s on an idle machine and ~80s under a sibling project's sweep (load 45). That is CPU contention, not a hang.
-8. **talk4me: SEC-01 HIGH** (deferred here from item 4 on 2026-09-23). Cap `api/tts.ts` at about 500 chars, allowlist voice ids,
-   add a Vercel Firewall rule. Model: Sonnet. After it is fixed, make the `talk4me` repo public.
-9. ~~**rental business: K4-R1/R2/R3 HIGH**~~ **Fixed 2026-09-26** (`6d75d45`, SEC-09–15, CI green). Open in that repo: SEC-16 (unrouted inbox, a design
-   question for Shane), the K4 LOWs, and K1/K6/K11 (tenant sign-out not server-side, same-origin referrer + no no-store on token pages, env schema covers 6 vars).
-10. ~~**clinic: K4-C1 HIGH**~~ **Fixed 2026-09-26** (`8c060a5`, SEC-07–11). Also fixed: clinic CI had been red at `npm ci` since SEC-06 (`b72b1f3`, 09-23) —
-   `a4d11ba` — which hid a date-rotted e2e spec, fixed in `62d7f1c`; CI green. Open in that repo: whether a group leader may write notes for attendees
-   they don't treat (Shane), and two LOWs (forms for any client; not-found vs forbidden oracle).
+---
 
-**Shane-only, no code (still to do):**
-- Revoke the Vercel token leaked in event-toolkit history (`b8310aa`, `.claude/settings.json`). This blocks making the repo public.
-- ElevenLabs spend cap (talk4me).
-- Rotate or remove the live Anthropic key and Neon credentials in `use-case-support-ticket-deflection/.env.local`.
+## Previous state (2026-10-26), kept as written
+## ▶ Was: State: decisions pass + Phase 3 complete on branch `kickoff` (PR #1, never merged by the agent). Stopped at the Phase 3 gate; the PRD names no Phase 4, so `docs/CLOSEOUT.md` is a draft to review.
 
-## Where things are
-- Spec (APPROVED v2): `FOUNDATION_SPEC.md`. Plan (APPROVED, M0–M9): `IMPLEMENTATION_PLAN.md`. Both were revised on 2026-09-23 after a Codex review (D-10 to D-12, INV-28, tighter S1–S3), and the revision is approved.
-- Portfolio audit baseline for the M9 scorecard: `audit/` (17 reports on the K1–K14 checklist).
-- SEC items were appended (uncommitted, for each repo's own session to commit) to:
-  - storage, Bookable and rental: `docs/prds/06-backlog.md`
-  - Countertop and reservations: `docs/backlog.md`
-  - clinic, groundwork and talk4me: `NEXT.md`
-  - alongside: `BACKLOG.md`
-  - showcall: `docs/backlog.md`
-  - event toolkit, design bridge, claude-dashboard and the three use-case repos: `SECURITY_BACKLOG.md`
-  - Use-Case Studio: its backlog file
+Cloud session 2026-10-26 (Claude Opus 5.5). Owner decisions D-42..D-47 recorded and applied; build defaults D-48..D-52; every Phase 3 number in `docs/EVAL.md` ("Decisions pass + Phase 3"); tasks ticked with what changed in `docs/phase-3-tasks.md`.
+
+### Decisions applied (owner, 2026-10-26)
+
+| Item | D | Result |
+|---|---|---|
+| 7 O-12 account ↔ employee | D-42 | nullable unique `Employee.userId`, set only by the audited HR action; email match only suggests |
+| 8 O-13 "today" | D-43 | `LeaveSettings.timeZone` (IANA, default America/Chicago); `src/leave-db/today.ts` is the only converter (grep test) |
+| 9 O-11 fallback skips the delegator | D-44 | R7′ + `FALLBACK_TO_DELEGATOR` in `leavelib.py` then TS; golden **GR-16**; fixture hits 0 → regenerated, **0 bytes moved** |
+| 10 O-6 overlap | D-45 | `OVERLAPPING_REQUEST` before A8 in both engines; golden **GR-17**; no fixture overlaps → `leave:eval` still 0 diffs |
+| 11 billing | D-46 | removed by the manifest + `…_remove_billing` migration; drift clean; `modules-removed` green |
+| 17 archive, keep Restrict | D-47 | `OrgArchive` (append-only), `assertWritable` on every write path, delete-org refused via the clone hook, no trigger disabled anywhere |
+
+Fixtures were NOT regenerated in content: the regeneration ran and moved 0 bytes; hashes unchanged (`ledger.csv` `86ab4ebe…`, `expected_balances.csv` `23fe55b4…`, `expected_requests.csv` `90cdd09a…`).
+
+### Re-proved before any Phase 3 code
+
+`leave:eval` 0 diffs (5057 / 198 / 389) · `ledger:verify` 198 rows 0 diffs · `fixtures:check` OK · DB: import → replay 6688 rows → replay 0 → `ledger:verify --db` 198/0 → `leave:eval --db` 0 diffs ×3, ledger hash `d2a090f80d2b…` (same as Phase 2).
+
+### Phase 3 (tasks 3.0–3.8, all ticked)
+
+Server actions (10, INV harness 0 findings) · My leave with preview · inbox · request page · HR console · ledger · nightly close · `/orgs` · e2e GR-15 walk + overlap + archive with axe light/dark (D-48: axe-core from node_modules, no new dependency). **408 tests / 52 files** green locally; **16/16 Playwright specs** green locally (Chromium at `/opt/pw-browsers`) and in CI.
+
+### CI runs this session
+
+| Commit | Run | Result |
+|---|---|---|
+| `b99d7e5` engines D-44/D-45 | https://github.com/shanelabountyai/ledgerleave/actions/runs/40345215197 | green |
+| `6bbb5f3` billing removed, schema, guards | https://github.com/shanelabountyai/ledgerleave/actions/runs/40346598856 | green (`ci`, `modules-removed`) |
+| `02021a5` Phase 3 pages, close, e2e | https://github.com/shanelabountyai/ledgerleave/actions/runs/40350551073 | green (`ci` incl. Playwright, `modules-removed`) |
+
+No red runs this session. Locally, the e2e walk found two real defects before CI saw them: an inline notice vanished with its card (fixed by D-52) and two pages awaited `params` before the guard (FR-06 harness; fixed).
+
+### Sandbox this session
+
+`prisma generate` with `PRISMA_SCHEMA_ENGINE_BINARY=/bin/true`; PostgreSQL 16 local, migrations by `psql -f`; full `npm test`, `next build` and Playwright (preinstalled Chromium) all ran locally. Not runnable here: `prisma migrate deploy/diff` (schema engine 403) and `foundation:check-modules` (no `rsync`) — CI ran both. A parallel session overwrote a shared helper script in the scratchpad; the two affected commit attempts aborted at `git add` and wrote nothing anywhere; ledgerleave's helpers moved to a private folder.
+
+### Open / by hand (owner)
+
+- **O-14** (new): the `DELEGATION_DEPTH_EXCEEDED` fallback has O-11's shape; fixture count 0; not changed (D-44 was scoped to O-11).
+- The template `/onboarding` list still shows archived orgs (template-owned); `/orgs` hides them.
+- Review PR #1; delete `proof/cap-2401`; run `prisma migrate diff` on the Mac; port row 7300 in `~/.claude/CLAUDE.md`; reuse scan; build-log card. Full list in `docs/CLOSEOUT.md`.
+
+---
+
+## Phase 2 record (2026-10-26), kept as written — was: State: Phase 2 complete on branch `kickoff` (PR #1, never merged by the agent). Stopped at the Phase 2 gate; Phase 3 not started — `docs/phase-3-tasks.md` is a draft to review.
+
+Unattended cloud build sessions: Phase 1 on 2026-10-25, Phase 2 on 2026-10-26 (Claude Fable 5.1). Phase 2 decisions D-35..D-41 and open items O-12, O-13 in `docs/decisions.md`; every Phase 2 number in `docs/EVAL.md` ("Phase 2 — the same answers from the database"); tasks ticked with what changed from the draft in `docs/phase-2-tasks.md`.
+
+### Phase 2 exit criteria — all met (CI run 40321952682 on `96536b9`, then the docs commits)
+
+| Criterion | Result | Command |
+|---|---|---|
+| `ledger:verify` against the database equals the oracle | 5057 LedgerEntry rows → **198 rows, 0 diffs** | `npm run ledger:verify:db` |
+| and the three reference files rebuilt from rows alone | `ledger.csv` 5057 · `expected_balances.csv` 198 · `expected_requests.csv` 389 — **0 diffs each**, trigger-assigned entry ids included | `npm run leave:eval:db` |
+| Replaying twice writes nothing the second time | first: 5057 / 389 / 429 / 813 inserted (ledger / chains / steps / events); second: **0 / 0 / 0 / 0**, 0 queued, same ledger hash | `npm run leave:replay` ×2 |
+| UPDATE/DELETE rejected by triggers | 5 tables (LedgerEntry, RequestCommand, RequestEvent, FrozenChain, RequestStep): 10 tamper tests, rows unchanged; org delete cannot cascade through; ORM refused | `tests/integration/leave/tamper.test.ts` |
+| Outbox holds the expected QUEUED rows, nothing sent | **759** (382 / 322 / 55), all `sentAt` null; count derived from the oracle's log lines; 0 captured; the cron drain is unwired (D-40) | `tests/integration/leave/replay.test.ts` |
+| Live writes through the engines | GR-15 reproduced through `submitRequest`/`approveRequest`/`reassignStep`; void approvals write 0 ledger and 0 outbox rows | `tests/integration/leave/actions.test.ts` |
+| Suite | 386 tests, 47 files, green locally under `TZ=America/Chicago` and in CI (PostgreSQL 17) | `npm test` |
+
+### What was built (tasks 2.1–2.9, ticked in `docs/phase-2-tasks.md`)
+
+- `prisma/schema/ledgerleave.prisma` + migrations `20261026000000_ledgerleave_init`, `20261026000001_request_command_ordinal`: 16 clone-owned tables, every day `CHAR(10)`, CHECK lists mirroring the TS vocabularies (tested for equality), append-only triggers, ledger seq/entryId assigned by trigger in posting order. `core.prisma` changed only by 15 `// app` back-relations (drift clean).
+- `scripts/leave/import-fixtures.ts` (`leave:import`): ten input files → tables, upsert by natural key, commands append-only with a within-day `ordinal`.
+- `src/leave-db/replay.ts` (`leave:replay`): World from tables → `Simulation` → insert the missing suffix; stored rows must be a prefix of the engine's answer or `ReplayDivergence` writes nothing (D-38). `src/leave-db/notify.ts` + `templates.ts`: outbox rows per applied event (D-23). `src/leave-db/actions.ts`: submit/approve/deny/cancel/reassign = append a command, replay the day open, one transaction (D-39). `src/leave-db/verify-db.ts` + `scripts/leave/eval-db.ts` (`leave:eval:db`, `ledger:verify:db`): the proofs from rows alone.
+- Engine: `RequestEvent.ordinal?` (within-day order for live writes), `Simulation.run({ openAsOfDay })`, a per-event observer — `leave:eval` unchanged at 0 diffs (`tests/unit/leave/live-order.test.ts`).
+- `src/app/cron-jobs.ts`: outbox drain unwired; the nightly close seam documented (2.8). `src/app/required-modules.ts`: `['notifications']`.
+- CI: after `vitest`, `import → replay → replay → verify --db → eval-db` on the runner's Postgres.
+
+### Red runs this session and what fixed them
+
+| Commit | Run | Red step | Fix |
+|---|---|---|---|
+| `f8a1935` 2.1/2.2 | https://github.com/shanelabountyai/ledgerleave/actions/runs/40319426296 | `typecheck` (both jobs): a destructured `$queryRawUnsafe` row is possibly undefined under `noUncheckedIndexedAccess`; the local incremental `tsc` had not re-checked the new file | `countRows` helper (`38c2e…` folded into the next push); the local check is now `rm tsconfig.tsbuildinfo && tsc --noEmit` |
+
+Green: `d09b02b` (2.1–2.3) run 40320500813; `96536b9` (2.4–2.9) run 40321952682. CI logs are not readable through the proxy (403 on the log blob); step names and conclusions are.
+
+### Left open for the owner
+
+- **O-12** who acts as whom (User ↔ Employee) and **O-13** the calendar-day source for "today" — both block Phase 3 task 3.0.
+- **O-6** overlap validation waited (no decision, no golden); **D-31** billing still unwired not removed; **O-11** unchanged.
+- `docs/phase-3-tasks.md` is a draft to review, not a plan to execute.
+- Two of my hand derivations were wrong again and corrected against the oracle before pinning (D-25): the H10 chain in `actions.test.ts` (the skip-level climbs to H1, it does not collapse onto H2), and the closed-day forfeiture count in `live-order.test.ts`. No expected value from the kit was edited.
+
+### Sandbox report (D-35)
+
+- `prisma generate` runs with `PRISMA_SCHEMA_ENGINE_BINARY=<any executable>` (the client generator never calls the schema engine); the sandbox's PostgreSQL 16 was online, so migrations were applied with `psql -f` in order and the FULL `npm test` ran locally (386 green). `.env.test` was written locally (gitignored).
+- Still CI-only: `prisma migrate deploy` / `migrate diff` (schema engine download is 403), Playwright. There is no `migrate diff` drift check in CI; the migration SQL was hand-written to Prisma's naming and the DB tests exercise every column — a Mac `npx prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema --shadow-database-url …` is on the to-do list.
+- Donors for the outbox (Callboard/Showcall) and ledger (LoanBook): still 403 from this session; written fresh from D-23 / D-8 (D-32 stands).
+
+### CI runs (branch `kickoff`, PR #1)
+
+| Commit | Run | Result |
+|---|---|---|
+| `f8a1935` 2.1/2.2 schema, migration, tests | https://github.com/shanelabountyai/ledgerleave/actions/runs/40319426296 | **red**: typecheck (fixed, see above) |
+| `d09b02b` 2.1–2.3 + engine ordinal/openAsOfDay | https://github.com/shanelabountyai/ledgerleave/actions/runs/40320500813 | green |
+| `96536b9` 2.4–2.9 (replay, outbox, verify/eval --db, actions, CI steps) | https://github.com/shanelabountyai/ledgerleave/actions/runs/40321952682 | green |
+| `b2dd3ab` Phase 2 gate docs | https://github.com/shanelabountyai/ledgerleave/actions/runs/40322972976 | green (`ci` and `modules-removed`) |
+
+### Still to do by hand (owner)
+
+- Review PR #1 (Phase 1 + Phase 2); merge when satisfied. Delete branch `proof/cap-2401` (left from Phase 1).
+- Run `npx prisma migrate diff` on the Mac (above) and `npm run test:e2e` once (Playwright never ran in the sandbox; CI runs it).
+- Decide O-12, O-13, O-6; `~/.claude/CLAUDE.md` port row (ledgerleave → 7300); build-log card #14 chips: `0 diffs vs Python oracle (5057 entries, 389 requests); replayed into Postgres: 198 rows 0 diffs, 759 notices queued, 0 sent`.
+- Re-run `~/Projects/reuse-scan.py` on the Mac (D-29).
+
+---
+
+## Phase 1 record (2026-10-25), kept as written
+
+### Phase 1 exit criteria — all met
+
+| Criterion | Result | Command |
+|---|---|---|
+| GA-01..GA-20, GR-01..GR-15 pass in TypeScript | 165 tests green in `tests/unit/leave/` | `npx vitest run tests/unit/leave` |
+| `leave:eval` reproduces all three expected files | **0 diffs**: `ledger.csv` 5057 rows, `expected_balances.csv` 198, `expected_requests.csv` 389; 15 void, 0 ignored, 2 recomputed; `--requests` identical to the oracle | `npm run leave:eval` |
+| `ledger:verify` 0 diffs | 5057 entries → 198 rows, 0 diffs | `npm run ledger:verify` |
+| `leave:route` reproduces S01–S20 | 20 of 20 (chain, working days, minutes, A8 verdict) | `npx vitest run tests/unit/leave/route-cli.test.ts` |
+| `docs/EVAL.md` exists | yes, every number next to its command | — |
+| CI enforces the gate under a non-UTC `TZ` | job-level `TZ=America/Chicago`; steps `engine:lint → leave:eval → ledger:verify → fixtures:check`; **red run proven** on `proof/cap-2401` (run 40261695679: `leave:eval` the only red step) | `.github/workflows/ci.yml` |
+| No forbidden import in the engines | `engine:lint OK: 0 hits` (clock, db, network, model, random, float, `new Date`) | `npm run engine:lint` |
+| Pre-Phase-2 check (`skip_level_over_days` 5 → 4 in a copy) | kept steps `{1: 355, 2: 33, 3: 1}` → `{1: 339, 2: 49, 3: 1}`, `leave:eval` exit 1, no code change | `npm run leave:eval -- --fixtures <copy>` |
+
+### What was built (tasks 1.1–1.12, all ticked in `docs/phase-1-tasks.md`)
+
+- `src/accrual/`: `calendar.ts` (C1–C5 on civil-day numbers; shape ported from Bookable, D-32), `minutes.ts` (D-6, `roundDiv`), `policy.ts` (D-15 closed vocabularies, names the failing field; routing table and `work_day_minutes` read and closed — plan C-1/C-2), `events.ts` (A1–A5), `ledger.ts` (L1–L5, append-only), `boundaries.ts` (A6–A7, `POSTING_ORDER` D-9), `simulate.ts` (the day plan; the only module importing both engines; `employeeYearRows`).
+- `src/routing/`: `org.ts` (state as of a date), `route.ts` (R1–R9, ordered codes, `chainString`, `stepRequiresHr`), `requests.ts` (S1–S6 as a transition table; returns ledger *effects* instead of posting, so routing imports nothing from accrual).
+- `scripts/leave/`: `eval.ts`, `verify.ts`, `route.ts`, `engine-lint.ts`, `load-fixtures.ts`, `csv.ts` (Python `csv` QUOTE_MINIMAL bytes), `report.ts` (the §10 summary, line for line).
+- `tsconfig.leave.json`: typechecks the engine files where the generated Prisma client is absent (D-34).
+
+### What was decided (see decisions.md for the why)
+
+D-29 reuse scan skipped (dated) · D-30 port 7300 unverified against `~/.claude/CLAUDE.md`, confirmed against the owner's CLONES.md row · D-31 billing and share links left unwired, not removed · D-32 donors: Bookable read, LoanBook/Adjuster/Bracketry/BoxLoop/Callboard 403 → written fresh · D-33 CI order and job-level TZ · D-34 sandbox limits · O-11 the `DELEGATE_LACKS_HR_ROLE` fallback lands on the delegating HR primary (oracle behaviour kept).
+
+Two of my own hand-derived test expectations were wrong and were corrected against `tools/leavelib.py` before pinning (D-25 in practice): the O-11 case above, and a hand scenario dated on the 2025-05-26 fixture holiday. No expected value from the kit was edited.
+
+### Left open for the owner
+
+- Review `docs/phase-1-plan.md` §4 (C-1..C-13) — especially **C-1** (routing table is data in the file but hard-coded in the oracle; the loader now rejects any other value) and **C-5** (job-level TZ — CI is green with it).
+- **O-11** (above). **O-6** overlap validation: Phase 2 task 2.5 or later? **D-31**: delete the billing module or keep it unwired.
+- `docs/phase-2-tasks.md` is a draft to review, not a plan to execute.
+
+### Sandbox report (KICKOFF step 4, D-34)
+
+- `npm ci` → `postinstall` → `prisma generate` **fails**: `Error: Failed to fetch sha256 checksum at https://binaries.prisma.sh/all_commits/0edf323efd1d98336f3f0a68684b56f689b900d3/debian-openssl-3.0.x/schema-engine.gz.sha256 - 403 Forbidden`. The `PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1` workaround was not used. `node_modules` is otherwise complete.
+- Locally: `foundation:drift` clean against v1.3.0; `lint` 0 errors; `typecheck` fails only on `Cannot find module '@/generated/prisma/...'` in template test helpers (CI generates it; the engine files typecheck with `tsconfig.leave.json`); `npm test` not run locally (no generated client, no Postgres on 5432) — engine tests run with `npx vitest run tests/unit/leave`; Playwright not attempted. Python 3.13 present; every `tools/*.py` step ran.
+- GitHub from this session: `gh api` reads work; **branch deletion is refused** (`git push --delete` and the refs API both 403 through the proxy), so the throwaway branch `proof/cap-2401` still exists.
+- Donors: Bookable readable (cloned beside the repo); loanbook, adjuster, bracketry, boxloop, callboard → HTTP 403 "GitHub access to this repository is not enabled for this session".
+
+### CI runs (branch `kickoff`, PR #1)
+
+| Commit | Run | Result |
+|---|---|---|
+| `51e0337` kit (before this session) | https://github.com/shanelabountyai/ledgerleave/actions/runs/40238855890 | green |
+| `41d6979` 1.1 + plan | https://github.com/shanelabountyai/ledgerleave/actions/runs/40259309626 | **red**: `typecheck` (and `check-modules`) — `engine-lint.ts` dynamically imported the not-yet-written `src/accrual/policy`; fixed in `8daf06f` by writing the module and importing it statically |
+| `8daf06f` 1.3–1.4 | https://github.com/shanelabountyai/ledgerleave/actions/runs/40259872959 | green |
+| `e229074` 1.5–1.8 | https://github.com/shanelabountyai/ledgerleave/actions/runs/40260545550 | green |
+| `986406e` 1.9 (`leave:eval` 0 diffs in CI) | https://github.com/shanelabountyai/ledgerleave/actions/runs/40261416672 | green |
+| `713f5f5` 1.10–1.11 | https://github.com/shanelabountyai/ledgerleave/actions/runs/40261623265 | green |
+| `38afd24` 1.12 workflow_dispatch | https://github.com/shanelabountyai/ledgerleave/actions/runs/40261689862 | green |
+| `proof/cap-2401` (throwaway, cap 2401) | https://github.com/shanelabountyai/ledgerleave/actions/runs/40261695679 | **red on purpose**: `leave:eval` fails, every earlier step green |
+| `ddcfcaa` 1.12 EVAL.md + Phase 1 gate docs | https://github.com/shanelabountyai/ledgerleave/actions/runs/40262018890 | green (`ci` and `modules-removed`) |
+
+### Still to do by hand (owner)
+
+- Review PR #1; merge when satisfied. The `CLONES.md` row is already on saas-foundation main (`a714ee9`).
+- **Delete branch `proof/cap-2401`** (one "PROOF ONLY" commit; the session could not delete remote branches).
+- `~/.claude/CLAUDE.md`: add the port row (ledgerleave → 7300); the file was not reachable from the cloud.
+- Build-log card #14: name **Ledgerleave**, PRD and repo links, status `in progress`, chips per `docs/portfolio-overlap.md` "Suggested card chips" (now true: `0 diffs vs Python oracle (5057 entries, 389 requests)`).
+- Decide D-31 (billing module), O-11, O-6 timing; re-run `~/Projects/reuse-scan.py` on the Mac (D-29).
+- Neon and Vercel only if this is ever deployed (not planned; synthetic data).
+
+Kickoff measurements (reference engine on the frozen fixtures, as of 2025-12-31): 50 employees (15 hourly), 5057 ledger entries (3986 accruals of which 1028 hit a max-balance cap, 760 usage days, 70 reversal days, 153 forfeitures of which 2 are recomputes after a retroactive entry), 389 requests (294 approved, 55 denied of which 33 by the system for insufficient balance, 39 cancelled, 1 pending at as-of), 15 void approval events, 0 ignored events. **The TypeScript engines now reproduce every one of these with 0 diffs.** These are the oracle's own answers on the generator's own traps (D-24); they say the TypeScript engines agree with the Python spec, not that the policies are right for any real company.
