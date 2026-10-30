@@ -1,9 +1,8 @@
 # NEXT
 
-## ▶ Next: look at production with Shane (design system + days shipped 2026-10-28, `d427b8f`)
+## ▶ Next: post Ledger 135/136 (production look done 2026-10-29)
 
-Done: `docs/design-brief.md`, D-60, `formatDays` (`_ui/days.ts`), one stylesheet, fonts via `next/font/google`. `npm test` 429 passed; e2e `--workers=1` 16 passed (axe light+dark). Pushed to `main` → Vercel rebuilds.
-Open: eyeball leave.labintelligence.co (fonts load? pills/chips read OK in dark?). One unexplained run: first `npm test` had 4 failed in 2 files after 1002s, not reproduced on re-run (429/429); suspected DB contention, unconfirmed. Then post Ledger 135/136 (first comments in `docs/CLOSEOUT.md`); share the brief first.
+Shane eyeballed leave.labintelligence.co after the design system (`d427b8f`): looks good. Remaining: share the exec brief, then post Ledger 135/136 with the first comments in `docs/CLOSEOUT.md`. Unconfirmed: the 4-failure `npm test` run (re-run 429/429), suspected DB contention.
 
 ---
 
