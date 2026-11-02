@@ -2,7 +2,7 @@
 
 ## ▶ Next: post Ledger 135/136 (production look done 2026-10-29)
 
-Shane eyeballed leave.labintelligence.co after the design system (`d427b8f`): looks good. Remaining: share the exec brief, then post Ledger 135/136 with the first comments in `docs/CLOSEOUT.md`. Unconfirmed: the 4-failure `npm test` run (re-run 429/429), suspected DB contention.
+Shane eyeballed leave.labintelligence.co after the design system (`d427b8f`): looks good. Done 2026-11-02: Ledgerleave blade on labintelligence.co/work (repo `labintelligence-site`, see CLOSEOUT). Remaining: share the exec brief (the blade links to it, so it 404s for visitors until shared), then post Ledger 135/136 with the first comments in `docs/CLOSEOUT.md`. Unconfirmed: the 4-failure `npm test` run (re-run 429/429), suspected DB contention.
 
 ---
 
