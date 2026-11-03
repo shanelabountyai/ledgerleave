@@ -23,6 +23,13 @@ export async function isArchived(orgId: string, tx: Pick<Tx, 'orgArchive'> = db)
   return (await tx.orgArchive.findUnique({ where: { orgId }, select: { orgId: true } })) !== null;
 }
 
+/** Which of these orgs are archived? One query, for lists (per-org `isArchived` would be N). */
+export async function archivedOrgIds(orgIds: readonly string[], tx: Pick<Tx, 'orgArchive'> = db): Promise<ReadonlySet<string>> {
+  if (orgIds.length === 0) return new Set();
+  const rows = await tx.orgArchive.findMany({ where: { orgId: { in: [...orgIds] } }, select: { orgId: true } });
+  return new Set(rows.map((r) => r.orgId));
+}
+
 /** Throws the user-facing refusal when the org is archived. Call it inside the write's transaction. */
 export async function assertWritable(tx: Pick<Tx, 'orgArchive'>, orgId: string): Promise<void> {
   if (await isArchived(orgId, tx)) throw new ActionRefused(ARCHIVED_MESSAGE);
