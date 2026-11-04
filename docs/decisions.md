@@ -166,3 +166,6 @@ Merged tag `v1.4.0` (carries v1.3.1, the `next` 16.3.8 `security:` patch). Confl
 
 ## D-62 — Foundation v1.4.1 merged, `security:` (2026-11-04)
 Merged tag `v1.4.1`: `next` 16.4.5 (critical unauthenticated RCE in Image Optimization, next <= 16.4.0), `zod` 4.6.7, `prisma`/`@prisma/client`/`@prisma/adapter-pg` 7.10.1, lockfile fixes for sharp, source-map-js, fast-uri. No runtime code, migration or env var; `filterListedOrgs` unchanged; template docs (NEXT, CLONES) keep ours. `npm audit --omit=dev`: 0 vulnerabilities. Production (leave.labintelligence.co) still runs the pre-merge build until this merges and redeploys; the template asks deployed clones to redeploy promptly. Also marks D-47's `/onboarding` caveat "closed by D-61".
+
+## D-63 — Vercel Preview builds off (2026-11-04)
+Owner decision 2026-11-04: Vercel Preview deploys failed on PRs #3, #4 and #5 (cause not read; likely no Preview env vars, as in gavel D-100). Builds are the bill, so `vercel.json`'s `ignoreCommand` now starts with `[ "$VERCEL_ENV" != "production" ] && exit 0;` (exit 0 = skip). The previous-SHA diff after it is unchanged, so production builds behave as before. Restore: drop the prefix, after setting `DATABASE_URL`, `AUTH_SECRET` and `APP_URL` for the Preview environment.
