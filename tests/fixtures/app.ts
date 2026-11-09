@@ -1,6 +1,6 @@
 // CLONE-OWNED. The INV-01..04 harness seeds these rows in both fixture orgs, so it can drive
 // actions whose inputs use ref('<model>') for the clone's own tables. Return { model: id } for
-// one row of each model, owned by `org.orgId`.
+// one row of each model, owned by `org.orgId`. INV-29 (RLS enforce) calls it too, so every org-owned clone table has rows to scope.
 //
 // Ledgerleave (Phase 3 task 3.1): one leave setup per org — settings, the fixture policy file, one employee (E001,
 // the harness's own owner is NOT linked to it, so engine commands are refused with a message as D-42 says) and one
