@@ -133,6 +133,6 @@ describe('rls:policies module guard (F-09)', () => {
     }
     // ledgerleave removed the billing module: every module whose tables remain must be a known one.
     const present = [...new Set(tables.map((t) => t.module).filter(Boolean))];
-    expect(present.filter((m) => !(m in MODULES))).toEqual([]);
+    expect(present.filter((m) => !m || !(m in MODULES))).toEqual([]);
   });
 });
