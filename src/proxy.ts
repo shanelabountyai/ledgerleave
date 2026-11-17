@@ -4,7 +4,7 @@ import { gate, ownCredential } from '@/app/demo-gate';
 /** Every route sits behind the demo password, except the ones that carry a credential of their own. */
 export function proxy(req: NextRequest) {
   if (ownCredential(req.nextUrl.pathname)) return NextResponse.next();
-  switch (gate(req.headers.get('authorization'), process.env)) {
+  switch (gate(req.headers.get('authorization'))) {
     case 'open':
     case 'allowed':
       return NextResponse.next();
