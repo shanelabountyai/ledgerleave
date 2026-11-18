@@ -12,7 +12,7 @@ export const CROSS_ORG_FILES: Readonly<Record<string, string>> = {
   'src/core/auth/demo.ts': "demo sign-in lists every demo user's orgs (sign-in)",
   'src/modules/notifications/outbox.ts': 'cron drain and sweep across every org', // notifications
   'scripts/seed-demo.ts': 'seed:demo writes several orgs',
-  'src/modules/sso/hooks.ts': '/login routing by email domain, the SSO-required link check, domain uniqueness, cron sweep', // sso
+  'src/modules/sso/hooks.ts': '/login routing by email domain, the SSO-required link check, domain uniqueness, cron sweep and domain re-check', // sso
   'src/modules/sso/flow.ts': 'the SSO callback: the state row names the org only once it is read', // sso
   'src/modules/apikeys/keys.ts': 'an API key names its org: the hashed-key lookup runs before any org is known', // apikeys
   'src/modules/apikeys/webhooks.ts': 'webhook fan-out and delivery: the cron sweep crosses every org', // apikeys
