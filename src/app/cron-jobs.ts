@@ -1,5 +1,5 @@
 import { nightlyClose } from '@/leave-db/close';
-import { sweepSsoStates } from '@/modules/sso/hooks'; // sso
+import { recheckSsoDomains, sweepSsoStates } from '@/modules/sso/hooks'; // sso
 import { cronWebhooks } from '@/modules/apikeys/webhooks'; // apikeys
 
 // Clone-owned (plan §3.2): /api/cron calls this after its own core sweeps. A clone adds its jobs here,
@@ -16,6 +16,7 @@ export async function cronJobs(): Promise<Record<string, unknown>> {
   return {
     leaveClose: await nightlyClose(),
     ssoStates: await sweepSsoStates(), // sso
+    ssoDomains: await recheckSsoDomains(), // sso
     webhooks: await cronWebhooks(), // apikeys
   };
 }
